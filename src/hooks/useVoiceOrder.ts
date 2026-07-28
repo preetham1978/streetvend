@@ -3,101 +3,180 @@ import { Language } from '../lib/I18nContext';
 
 interface UseVoiceOrderProps {
   language: Language;
-  onTranscriptComplete?: (transcript: string) => void;
+  onTranscriptComplete?: (transcript: string, base64Audio?: string, mimeType?: string) => void;
 }
 
 export function useVoiceOrder({ language, onTranscriptComplete }: UseVoiceOrderProps) {
   const [isListening, setIsListening] = useState(false);
-  const [transcript, setTranscript] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [transcript, setTranscriptState] = useState('');
+  const transcriptRef = useRef('');
   const [error, setError] = useState<string | null>(null);
+
+  const setTranscript = useCallback((text: string) => {
+    setTranscriptState(text);
+    transcriptRef.current = text;
+  }, []);
+
   const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
   const onTranscriptCompleteRef = useRef(onTranscriptComplete);
 
   useEffect(() => {
     onTranscriptCompleteRef.current = onTranscriptComplete;
   }, [onTranscriptComplete]);
 
-  useEffect(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    
-    if (!SpeechRecognition) {
-      setError('Speech recognition is not supported in this browser.');
-      return;
+  const getSpeechRecognitionClass = () => {
+    if (typeof window === 'undefined') return null;
+    return (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
+  };
+
+  const stopListening = useCallback(() => {
+    console.log('[Boli Voice Engine] Stopping capture...');
+    setIsListening(false);
+    setIsProcessing(true);
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (err) {
+        console.warn('[Boli Voice Engine] SpeechRecognition stop warning:', err);
+      }
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = true;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (err) {
+        console.warn('[Boli Voice Engine] MediaRecorder stop warning:', err);
+      }
+    }
 
-    // Map internal language codes to BCP 47
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+  }, []);
+
+  const startListening = useCallback(async () => {
+    console.log('[Boli Voice Engine] Starting session...');
+    setError(null);
+    setTranscript('');
+    setIsProcessing(false);
+    audioChunksRef.current = [];
+
     const langMap: Record<Language, string> = {
       en: 'en-IN',
       hi: 'hi-IN',
       ta: 'ta-IN',
       kn: 'kn-IN'
     };
-    recognition.lang = langMap[language] || 'en-IN';
+    const bcpLang = langMap[language] || 'en-IN';
 
-    recognition.onstart = () => {
-      setIsListening(true);
-      setTranscript('');
-      setError(null);
-    };
+    try {
+      // 1. Get Stream
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Media devices not supported in this browser/context.');
+      }
 
-    recognition.onerror = (event: any) => {
-      console.error('Speech recognition error', event.error);
-      setError(event.error);
-      setIsListening(false);
-    };
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
 
-    recognition.onend = () => {
-      setIsListening(false);
-    };
+      // 2. Initialize MediaRecorder (PRIMARY)
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      
+      const mimeTypes = isIOS 
+        ? ['audio/mp4', 'audio/aac', 'audio/wav']
+        : ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/wav'];
+        
+      const selectedMime = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || '';
+      const mimeType = selectedMime || (isIOS ? 'audio/mp4' : 'audio/webm');
 
-    recognition.onresult = (event: any) => {
-      let interimTranscript = '';
-      let finalTranscript = '';
+      const recorder = new MediaRecorder(stream, selectedMime ? { mimeType: selectedMime } : undefined);
+      mediaRecorderRef.current = recorder;
 
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
-        } else {
-          interimTranscript += event.results[i][0].transcript;
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
         }
+      };
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        console.log(`[Boli Voice Engine] Recording stopped. Blob size: ${audioBlob.size} (${mimeType})`);
+
+        if (audioBlob.size > 0) {
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          reader.onloadend = () => {
+            const base64Audio = reader.result as string;
+            if (onTranscriptCompleteRef.current) {
+              onTranscriptCompleteRef.current(transcriptRef.current, base64Audio, mimeType);
+            }
+            setIsProcessing(false);
+          };
+        } else {
+          if (onTranscriptCompleteRef.current && transcriptRef.current) {
+            onTranscriptCompleteRef.current(transcriptRef.current);
+          }
+          setIsProcessing(false);
+        }
+      };
+
+      // Tiny delay for mobile stream stability
+      setTimeout(() => {
+        if (recorder.state === 'inactive') {
+          recorder.start(250);
+          setIsListening(true);
+        }
+      }, 100);
+
+      // 3. Initialize SpeechRecognition (SECONDARY - for real-time visual only)
+      const SpeechRecognitionClass = getSpeechRecognitionClass();
+      if (SpeechRecognitionClass) {
+        const recognition = new SpeechRecognitionClass();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = bcpLang;
+
+        recognition.onresult = (event: any) => {
+          let currentTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            currentTranscript += event.results[i][0].transcript;
+          }
+          setTranscript(currentTranscript.trim());
+        };
+
+        recognition.onerror = (event: any) => {
+          console.warn('[Boli Voice Engine] SpeechRecognition error (falling back to pure audio):', event.error);
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
       }
 
-      const currentTranscript = finalTranscript || interimTranscript;
-      setTranscript(currentTranscript);
-
-      if (finalTranscript && onTranscriptCompleteRef.current) {
-        onTranscriptCompleteRef.current(finalTranscript);
+    } catch (err: any) {
+      console.error('[Boli Voice Engine] Failed to start:', err);
+      let userMsg = 'Could not access microphone.';
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        userMsg = 'Microphone permission denied. Please allow access.';
+      } else if (!window.isSecureContext) {
+        userMsg = 'Microphone requires a secure (HTTPS) connection.';
       }
-    };
-
-    recognitionRef.current = recognition;
-  }, [language]);
-
-  const startListening = useCallback(() => {
-    if (recognitionRef.current && !isListening) {
-      try {
-        recognitionRef.current.start();
-      } catch (err) {
-        console.error('Failed to start recognition', err);
-      }
+      setError(userMsg);
+      setIsListening(false);
     }
-  }, [isListening]);
-
-  const stopListening = useCallback(() => {
-    if (recognitionRef.current && isListening) {
-      recognitionRef.current.stop();
-    }
-  }, [isListening]);
+  }, [language, setTranscript]);
 
   return {
     isListening,
+    isProcessing,
     transcript,
     error,
     startListening,
     stopListening
   };
 }
+

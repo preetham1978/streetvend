@@ -39,7 +39,76 @@ async function startServer() {
     }
   });
 
+  app.post("/api/vision-scan", async (req, res) => {
+    try {
+      const { image, products, language } = req.body || {};
+      if (!image) return res.status(400).json({ error: "No image data provided" });
+
+      const ai = new GoogleGenAI({ 
+        apiKey: process.env.GEMINI_API_KEY,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+      });
+
+      const prompt = `Identify the product in this image. Match it against this catalog: ${JSON.stringify(products || [])}. 
+      If you see text (OCR), use it to identify the brand and product name.
+      Return ONLY a JSON object with: { "productId": "id", "name": "found name", "confidence": 0.9, "detectedText": "any text seen" }.
+      If no match is found, return { "error": "Not recognized" }.`;
+
+      const response = await withRetry(() => ai.models.generateContent({
+        model: "gemini-1.5-flash", 
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: "image/jpeg",
+                  data: image.split(',')[1] // Strip data:image/jpeg;base64,
+                }
+              }
+            ]
+          }
+        ],
+        config: {
+          responseMimeType: "application/json",
+        }
+      }));
+
+      const result = JSON.parse(response.text || '{}');
+      res.json(result);
+    } catch (error: any) {
+      console.error("Vision API Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // API routes
+  const withRetry = async (fn: () => Promise<any>, retries = 3, delay = 1000) => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await fn();
+      } catch (error: any) {
+        const errorMsg = error?.message?.toLowerCase() || "";
+        const isRetryable = error?.status === 503 || 
+                            error?.status === 429 || 
+                            error?.code === 503 || 
+                            error?.code === 429 ||
+                            errorMsg.includes("quota") || 
+                            errorMsg.includes("rate limit") ||
+                            errorMsg.includes("exhausted");
+        
+        if (isRetryable && i < retries - 1) {
+          const waitTime = delay * Math.pow(2, i) + Math.random() * 1000;
+          console.log(`Gemini API busy (503/429). Retrying in ${Math.round(waitTime)}ms... (Attempt ${i + 1}/${retries})`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+        throw error;
+      }
+    }
+  };
+
   app.post("/api/admin-login", (req, res) => {
     try {
       const { password } = req.body || {};
@@ -76,13 +145,13 @@ async function startServer() {
             httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
           });
           
-          const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash-lite",
+          const response = await withRetry(() => ai.models.generateContent({
+            model: "gemini-1.5-flash",
             contents: prompt,
             config: {
               systemInstruction: `You are Streetvend AI, an intelligent business assistant for street vendors. Respond in ${language || 'en'}. Keep it concise, practical, and highly actionable.`,
             }
-          });
+          }));
           
           textResponse = response.text || "";
         } catch (genError) {
@@ -114,67 +183,90 @@ async function startServer() {
 
   app.post("/api/voice-order", async (req, res) => {
     try {
-      const { transcript, products } = req.body;
+      const { transcript, audio, mimeType, products } = req.body;
       let orderData: any[] = [];
+      let extractedTranscript = transcript || "";
 
-      if (process.env.GEMINI_API_KEY && transcript) {
+      if (process.env.GEMINI_API_KEY) {
         try {
           const ai = new GoogleGenAI({ 
             apiKey: process.env.GEMINI_API_KEY,
             httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
           });
           
-          const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash-lite",
-            contents: `Extract a structured order from the following transcript: "${transcript}".
-            Available products list: ${JSON.stringify(products || [])}.
-            Match items using product names or keywords.
-            Return ONLY a raw JSON array of objects with 'productId', 'name', 'price', and 'quantity'. Do not wrap in markdown.`,
-            config: {
-                responseMimeType: "application/json",
-            }
-          });
-          
-          const rawText = (response.text || "").replace(/```json/g, "").replace(/```/g, "").trim();
-          orderData = JSON.parse(rawText || "[]");
+          if (audio) {
+            console.log("[server.ts /api/voice-order] Processing audio recording with Gemini...");
+            const cleanBase64 = audio.includes(",") ? audio.split(",")[1] : audio;
+            
+            const prompt = `You are a street food vendor's AI assistant. 
+Listen to this voice recording and extract the customer's order.
+Match items to this catalog: ${JSON.stringify(products || [])}.
+
+Return ONLY valid JSON in this format:
+{
+  "transcript": "The full spoken text",
+  "order": [
+    { "productId": "p_id", "name": "Catalog Name", "quantity": 2 }
+  ]
+}`;
+
+            const result = await withRetry(() => ai.models.generateContent({
+              model: "gemini-1.5-flash",
+              contents: [
+                {
+                  inlineData: {
+                    mimeType: mimeType || "audio/webm",
+                    data: cleanBase64
+                  }
+                },
+                { text: prompt }
+              ]
+            }));
+
+            const rawText = result.text.replace(/```json/g, "").replace(/```/g, "").trim();
+            const parsed = JSON.parse(rawText);
+            orderData = parsed.order || [];
+            extractedTranscript = parsed.transcript || transcript || "";
+          } else if (transcript) {
+            console.log(`[server.ts /api/voice-order] Processing text transcript: "${transcript}"`);
+            const prompt = `Extract a structured order from this text: "${transcript}".
+Match to this catalog: ${JSON.stringify(products || [])}.
+Return ONLY a JSON array of objects with 'productId', 'name', and 'quantity'.`;
+
+            const result = await withRetry(() => ai.models.generateContent({
+              model: "gemini-1.5-flash",
+              contents: prompt
+            }));
+            const rawText = result.text.replace(/```json/g, "").replace(/```/g, "").trim();
+            orderData = JSON.parse(rawText);
+          }
         } catch (genError) {
           console.error("Gemini Voice Order API Error:", genError);
         }
       }
 
-      if (!orderData || !Array.isArray(orderData) || orderData.length === 0) {
-        const lowerTranscript = (transcript || "").toLowerCase();
-        const matchedItems: any[] = [];
-        const prodList = Array.isArray(products) && products.length > 0 ? products : [
-          { id: '101', name: 'Pani Puri', price: 40 },
-          { id: '102', name: 'Bhel Puri', price: 50 },
-          { id: '103', name: 'Aloo Tikki', price: 60 }
-        ];
-
-        for (const prod of prodList) {
-          const prodNameLower = prod.name.toLowerCase();
-          const firstWord = prodNameLower.split(' ')[0];
-          if (lowerTranscript.includes(prodNameLower) || (firstWord.length > 3 && lowerTranscript.includes(firstWord))) {
-            let qty = 1;
-            const numbers = lowerTranscript.match(/\d+/g);
-            if (numbers && numbers.length > 0) {
-              qty = parseInt(numbers[0], 10) || 1;
-            }
-            matchedItems.push({
-              productId: prod.id,
-              name: prod.name,
-              price: prod.price,
-              quantity: qty
-            });
-          }
+      // Final processing: ensure prices are attached and items are valid
+      const finalItems = (orderData || []).map((item: any) => {
+        const prod = products?.find((p: any) => p.id === item.productId || p.name.toLowerCase() === item.name?.toLowerCase());
+        if (prod) {
+          return {
+            productId: prod.id,
+            name: prod.name,
+            price: prod.price,
+            quantity: item.quantity || 1
+          };
         }
-        orderData = matchedItems;
-      }
+        return null;
+      }).filter(Boolean);
 
-      res.json({ order: orderData });
+      res.json({ 
+        transcript: extractedTranscript, 
+        order: finalItems,
+        items: finalItems 
+      });
     } catch (error: any) {
       console.error("Voice order handler error:", error);
-      res.json({ order: [] });
+      res.status(500).json({ error: "Failed to process voice order" });
     }
   });
 
@@ -197,13 +289,13 @@ async function startServer() {
                     prompt = `Analyze the following inventory/product data and predict low stock or stock depletion velocity. Return JSON with structure: { "predictions": [{ "productId": "Product Name (e.g. Pani Puri)", "daysLeft": 0, "recommendation": "..." }] }. Always use the product's actual display name for 'productId', never use codes like p7 or p8. Products: ${JSON.stringify(vendorData || [])}`;
                 }
 
-                const response = await ai.models.generateContent({
-                    model: "gemini-2.5-flash-lite",
+                const response = await withRetry(() => ai.models.generateContent({
+                    model: "gemini-1.5-flash",
                     contents: prompt,
                     config: {
                         responseMimeType: "application/json",
                     }
-                });
+                }));
 
                 const rawText = (response.text || "").replace(/```json/g, "").replace(/```/g, "").trim();
                 resultData = JSON.parse(rawText || '{}');
@@ -274,13 +366,13 @@ Format as JSON:
   "insights": ["insight1", "insight2"]
 }`;
                 
-                const response = await ai.models.generateContent({
-                    model: "gemini-2.5-flash-lite",
+                const response = await withRetry(() => ai.models.generateContent({
+                    model: "gemini-1.5-flash",
                     contents: prompt,
                     config: {
                         responseMimeType: "application/json",
                     }
-                });
+                }));
                 
                 const rawText = (response.text || "").replace(/```json/g, "").replace(/```/g, "").trim();
                 summaryData = JSON.parse(rawText || '{}');

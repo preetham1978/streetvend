@@ -11,7 +11,7 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.png', 'apple-touch-icon.png', 'pwa-maskable.png', 'icon-192.png', 'icon-512.png'],
+        includeAssets: ['icon-512.jpg', 'pwa-maskable.jpg'],
         manifest: {
           name: 'Streetvend - Smart Street Food & Cart POS',
           short_name: 'Streetvend',
@@ -24,27 +24,15 @@ export default defineConfig(() => {
           scope: '/',
           icons: [
             {
-              src: 'icon-192.png',
-              sizes: '192x192',
-              type: 'image/png',
-              purpose: 'any',
-            },
-            {
-              src: 'apple-touch-icon.png',
-              sizes: '180x180',
-              type: 'image/png',
-              purpose: 'any',
-            },
-            {
-              src: 'icon-512.png',
+              src: 'icon-512.jpg',
               sizes: '512x512',
-              type: 'image/png',
+              type: 'image/jpeg',
               purpose: 'any',
             },
             {
-              src: 'pwa-maskable.png',
+              src: 'pwa-maskable.jpg',
               sizes: '512x512',
-              type: 'image/png',
+              type: 'image/jpeg',
               purpose: 'maskable',
             },
           ],

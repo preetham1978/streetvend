@@ -43,10 +43,10 @@ export default function CartPage() {
     const activeProducts = products.length > 0 ? products : DEFAULT_PRODUCTS;
 
     // Voice recognition hook (Boli Mode)
-    const { isListening, transcript, startListening, stopListening } = useVoiceOrder({
+    const { isListening, isProcessing: isVoiceProcessing, transcript, startListening, stopListening } = useVoiceOrder({
         language: user?.language || 'en',
-        onTranscriptComplete: async (finalTranscript) => {
-            await handleParseVoiceOrder(finalTranscript);
+        onTranscriptComplete: async (finalTranscript, audioBase64, mimeType) => {
+            await handleParseVoiceOrder(finalTranscript, audioBase64, mimeType);
         }
     });
 
@@ -90,14 +90,21 @@ export default function CartPage() {
         }
     }
 
-    const handleParseVoiceOrder = async (text: string) => {
+    const handleParseVoiceOrder = async (text: string, base64Audio?: string, mimeType?: string) => {
+        if (!text.trim() && !base64Audio) return;
+        
         setIsParsingVoice(true);
-        setVoiceFeedback(`Processing: "${text}"...`);
+        setVoiceFeedback(`Processing: "${text || 'Audio'}"...`);
         try {
             const res = await fetch('/api/voice-order', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ transcript: text, products: activeProducts })
+                body: JSON.stringify({ 
+                    transcript: text, 
+                    audio: base64Audio,
+                    mimeType,
+                    products: activeProducts 
+                })
             });
             if (res.ok) {
                 const data = await res.json();
@@ -587,7 +594,15 @@ export default function CartPage() {
                                             Bill by speaking
                                         </h4>
                                         <p className="text-[10px] text-text-secondary mt-0.5">
-                                            {isListening ? (transcript ? `"${transcript}"` : 'Listening now...') : 'Tap mic · speak · stop'}
+                                            {isVoiceProcessing || isParsingVoice ? (
+                                                <span className="text-brand-500 font-bold flex items-center gap-1">
+                                                    <Loader2 className="w-3 h-3 animate-spin" /> Processing order...
+                                                </span>
+                                            ) : isListening ? (
+                                                transcript ? `"${transcript}"` : 'Listening now...'
+                                            ) : (
+                                                'Tap mic · speak · stop'
+                                            )}
                                         </p>
                                     </div>
 

@@ -1,11 +1,12 @@
 export interface Vendor {
     id: string;
+    userId?: string;
     storeName: string;
     ownerName: string;
     phone: string;
     email?: string;
     category: string;
-    plan: 'free' | 'starter' | 'professional' | 'enterprise';
+    plan: 'free' | 'starter' | 'growth' | 'professional' | 'enterprise';
     subPaid: number;
     isActive: boolean;
     qrCodeUrl: string | null;
@@ -21,9 +22,12 @@ export interface Product {
     unit?: string;
     stock: number;
     category: string;
+    barcode?: string;
+    type?: 'product' | 'service';
 }
 
 export interface OrderItem {
+    id?: string;
     productId: string;
     name: string;
     price: number;

@@ -1,14 +1,12 @@
 import { useState, useEffect, ReactNode } from 'react';
 import { useAuth } from '../lib/auth';
 import { mockDb, supabase, mapProductFromDb, mapOrderFromDb } from '../lib/supabase';
-import { Product, OrderItem, Order } from '../lib/database.types';
-import { Plus, Mic, Box, MessageCircle, QrCode, Printer, Sparkles, Bot, CreditCard, ScanBarcode, Send, Loader2, CheckCircle2, X, ChevronRight, ShoppingCart, BarChart3, Settings } from 'lucide-react';
+import { Product, Order } from '../lib/database.types';
+import { Plus, Box, QrCode, Bot, CreditCard, Send, Loader2, X, ChevronRight, ShoppingCart, BarChart3, Sparkles, MessageCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
-import { useVoiceOrder } from '../hooks/useVoiceOrder';
 import { motion, AnimatePresence } from 'motion/react';
 import { useI18n } from '../lib/I18nContext';
-import { AudioVisualizer } from '../components/AudioVisualizer';
 import SalesTrendChart from '../components/SalesTrendChart';
 import AIForecastChart from '../components/AIForecastChart';
 import StockPredictionWidget from '../components/StockPredictionWidget';
@@ -23,8 +21,8 @@ const TOUR_STEPS: TourStep[] = [
     },
     {
         target: '[data-tour="quick-tools"]',
-        title: 'Quick Tools & Voice AI',
-        description: 'Launch Boli Mode for hands-free AI voice ordering, dictation notes, QR code links, and product management.',
+        title: 'Quick Tools',
+        description: 'Manage products, generate store QR codes, and access your personal AI business assistant.',
         position: 'right'
     },
     {
@@ -76,8 +74,10 @@ export default function VendorDashboard() {
     
     // UI states for modals
     const [isTourOpen, setIsTourOpen] = useState(false);
-    const [showVoiceModal, setShowVoiceModal] = useState(false);
-    const [showVoiceNoteModal, setShowVoiceNoteModal] = useState(false);
+    const [showChatModal, setShowChatModal] = useState(false);
+    const [chatInput, setChatInput] = useState('');
+    const [chatHistory, setChatHistory] = useState<{role: 'user'|'ai', text: string}[]>([]);
+    const [notes, setNotes] = useState<{text: string, date: string}[]>([]);
 
     useEffect(() => {
         if (user && !localStorage.getItem('has_seen_dashboard_tour')) {
@@ -88,16 +88,6 @@ export default function VendorDashboard() {
         }
     }, [user]);
 
-    const handleTourComplete = () => {
-        localStorage.setItem('has_seen_dashboard_tour', 'true');
-    };
-    const [showChatModal, setShowChatModal] = useState(false);
-    const [chatInput, setChatInput] = useState('');
-    const [chatHistory, setChatHistory] = useState<{role: 'user'|'ai', text: string}[]>([]);
-    const [parsedOrder, setParsedOrder] = useState<OrderItem[]>([]);
-    const [isParsing, setIsParsing] = useState(false);
-    const [notes, setNotes] = useState<{text: string, date: string}[]>([]);
-    const [editableNote, setEditableNote] = useState('');
     const [isAnalyzingNotes, setIsAnalyzingNotes] = useState(false);
     const [noteSummary, setNoteSummary] = useState<{restock?: string[], prep?: string[], insights?: string[]} | null>(null);
 
@@ -122,58 +112,6 @@ export default function VendorDashboard() {
             alert(`Error analyzing notes: ${error.message}`);
         } finally {
             setIsAnalyzingNotes(false);
-        }
-    };
-
-    const { isListening, transcript, startListening, stopListening, error: voiceError } = useVoiceOrder({
-        language: user?.language || 'en',
-        onTranscriptComplete: async (finalTranscript) => {
-            await handleParseOrder(finalTranscript);
-        }
-    });
-
-    const { 
-        isListening: isNoteListening, 
-        transcript: noteTranscript, 
-        startListening: startNoteListening, 
-        stopListening: stopNoteListening, 
-        error: noteError 
-    } = useVoiceOrder({
-        language: user?.language || 'en'
-    });
-
-    useEffect(() => {
-        setEditableNote(noteTranscript);
-    }, [noteTranscript]);
-
-    const handleSaveNote = () => {
-        if (editableNote.trim()) {
-            setNotes(prev => [{ text: editableNote, date: new Date().toISOString() }, ...prev]);
-            setShowVoiceNoteModal(false);
-            setEditableNote('');
-        }
-    };
-
-    const handleParseOrder = async (text: string) => {
-        setIsParsing(true);
-        try {
-            const res = await fetch('/api/voice-order', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ transcript: text, products })
-            });
-            if (!res.ok) {
-                throw new Error(`HTTP error! status: ${res.status}`);
-            }
-            const data = await res.json();
-            if (data.order && data.order.length > 0) {
-                setParsedOrder(data.order);
-            }
-        } catch (error: any) {
-            console.error('Failed to parse order', error);
-            alert(`Error parsing order: ${error.message}`);
-        } finally {
-            setIsParsing(false);
         }
     };
 
@@ -235,8 +173,6 @@ export default function VendorDashboard() {
 
     const quickActions = [
         { name: 'New Bill', icon: Plus, color: 'text-brand-500', bg: 'bg-brand-500/10', action: () => navigate('/cart') },
-        { name: 'Boli Mode', icon: Mic, color: 'text-blue-500', bg: 'bg-blue-500/10', action: () => setShowVoiceModal(true) },
-        { name: 'Voice Note', icon: MessageCircle, color: 'text-yellow-500', bg: 'bg-yellow-500/10', action: () => setShowVoiceNoteModal(true) },
         { name: 'Products', icon: Box, color: 'text-green-500', bg: 'bg-green-500/10', action: () => navigate('/products') },
         { name: 'QR Code', icon: QrCode, color: 'text-purple-500', bg: 'bg-purple-500/10', action: () => alert(`Store QR Code Link: ${window.location.origin}/store/${user.id}`) },
         { name: 'AI Assistant', icon: Bot, color: 'text-teal-500', bg: 'bg-teal-500/10', action: () => navigate('/ai-assistant') },
@@ -266,11 +202,12 @@ export default function VendorDashboard() {
         }
     };
 
+    const handleTourComplete = () => {
+        localStorage.setItem('has_seen_dashboard_tour', 'true');
+    };
+
     return (
-        <div className={cn(
-            "min-h-screen pt-28 pb-12 transition-all duration-500",
-            (isListening || isNoteListening) ? "bg-bg-base shadow-[inset_0_0_0_4px_rgba(239,68,68,0.5)]" : "bg-bg-base"
-        )}>
+        <div className="min-h-screen pt-28 pb-12 bg-bg-base">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 
                 {/* Header Card */}
@@ -278,19 +215,9 @@ export default function VendorDashboard() {
                     <div className="absolute inset-0 hero-glow opacity-30 pointer-events-none"></div>
                     <div className="relative z-10">
                         <div className="flex flex-wrap items-center gap-4 mb-4">
-                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-display font-extrabold tracking-tighter text-text-primary leading-tight uppercase truncate max-w-full">{user.storeName}</h1>
+                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-display font-extrabold text-text-primary leading-tight truncate max-w-full">{user.storeName}</h1>
                             <span className="px-3 py-1 rounded-full bg-brand-500/10 text-brand-500 text-[10px] font-bold uppercase tracking-widest border border-brand-500/20">{user.plan}</span>
                             <TourTriggerButton onClick={() => setIsTourOpen(true)} />
-                            {(isListening || isNoteListening) && (
-                                <motion.div 
-                                    initial={{ opacity: 0, scale: 0.8 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 border border-red-500/30 rounded-full"
-                                >
-                                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                                    <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest animate-pulse">Recording</span>
-                                </motion.div>
-                            )}
                         </div>
                         <p className="text-text-tertiary font-bold uppercase tracking-widest text-xs">{user.ownerName} · {user.category}</p>
                     </div>
@@ -529,14 +456,14 @@ export default function VendorDashboard() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-xl"
+                        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-xl"
                     >
                         <motion.div 
                             initial={{ y: '100%' }}
                             animate={{ y: 0 }}
                             exit={{ y: '100%' }}
                             transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-                            className="bg-bg-surface rounded-t-[2.5rem] sm:rounded-[2.5rem] w-full max-w-lg shadow-2xl border border-border-subtle flex flex-col h-[80vh] sm:h-[650px] overflow-hidden mt-auto sm:mt-0"
+                            className="bg-bg-surface rounded-t-[2.5rem] sm:rounded-[2.5rem] w-full max-w-lg shadow-2xl border border-border-subtle flex flex-col h-[85vh] sm:h-[650px] overflow-hidden mt-auto sm:mt-0 pb-8 sm:pb-0"
                         >
                             <div className="w-12 h-1 bg-border-subtle rounded-full mx-auto mt-4 sm:hidden shrink-0" />
                             <div className="p-6 border-b border-border-subtle flex justify-between items-center bg-bg-base/50">
@@ -592,236 +519,6 @@ export default function VendorDashboard() {
                                     </button>
                                 </div>
                             </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-
-                {showVoiceModal && (
-                    <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-bg-base/95 backdrop-blur-2xl"
-                    >
-                        <motion.div 
-                            initial={{ y: '100%' }}
-                            animate={{ y: 0 }}
-                            exit={{ y: '100%' }}
-                            transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-                            className="w-full max-w-lg text-center bg-bg-surface rounded-t-[2.5rem] sm:rounded-none sm:bg-transparent p-8 sm:p-0 mt-auto sm:mt-0 relative"
-                        >
-                            <div className="w-12 h-1 bg-border-subtle rounded-full mx-auto mb-8 sm:hidden shrink-0" />
-                            <button 
-                                onClick={() => { stopListening(); setShowVoiceModal(false); setParsedOrder([]); }} 
-                                className="absolute top-4 right-4 sm:top-8 sm:right-8 w-12 h-12 flex items-center justify-center rounded-full bg-bg-surface border border-border-subtle text-text-tertiary hover:text-text-primary transition-all active:scale-90 shadow-xl"
-                            >
-                                <X className="w-6 h-6" />
-                            </button>
-
-                            <div className="mb-12">
-                                <h3 className="font-sans font-bold text-5xl text-text-primary tracking-tight mb-4 italic">Boli Mode</h3>
-                                <p className="text-brand-500 font-bold uppercase tracking-widest text-xs">
-                                    Listening in {user.language === 'en' ? 'English' : user.language === 'hi' ? 'Hindi' : user.language === 'ta' ? 'Tamil' : 'Kannada'}
-                                </p>
-                            </div>
-                            
-                            <div className="relative mx-auto w-64 h-64 mb-16 flex items-center justify-center">
-                                {isListening && (
-                                    <>
-                                        <motion.div 
-                                            animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0.1, 0.3] }}
-                                            transition={{ repeat: Infinity, duration: 2 }}
-                                            className="absolute inset-0 bg-brand-500/20 rounded-full"
-                                        />
-                                        <motion.div 
-                                            animate={{ scale: [1, 2, 1], opacity: [0.2, 0, 0.2] }}
-                                            transition={{ repeat: Infinity, duration: 2.5 }}
-                                            className="absolute inset-0 bg-brand-500/10 rounded-full"
-                                        />
-                                    </>
-                                )}
-                                <button 
-                                    onClick={() => isListening ? stopListening() : startListening()}
-                                    className={cn(
-                                        "relative z-10 w-48 h-48 rounded-full flex items-center justify-center text-white transition-all shadow-[0_0_60px_rgba(255,107,0,0.3)] hover:shadow-[0_0_80px_rgba(255,107,0,0.5)] active:scale-90 ring-8 ring-brand-500/10",
-                                        isListening ? "primary-button-gradient" : "bg-bg-surface border-4 border-border-subtle"
-                                    )}
-                                >
-                                    <Mic className={cn("w-20 h-20", isListening && "animate-pulse")} />
-                                </button>
-                            </div>
-                            
-                            {isListening && (
-                                <div className="mb-8 w-full max-w-sm mx-auto">
-                                    <AudioVisualizer isRecording={isListening} color="#FF6B00" />
-                                </div>
-                            )}
-
-                            <div className="max-w-md mx-auto h-40 flex flex-col items-center justify-center mb-12">
-                                {isParsing ? (
-                                    <div className="flex flex-col items-center gap-4">
-                                        <Loader2 className="w-10 h-10 text-brand-500 animate-spin" />
-                                        <p className="text-sm font-bold text-brand-500 uppercase tracking-widest animate-pulse">Streetvend AI parsing your order...</p>
-                                    </div>
-                                ) : parsedOrder.length > 0 ? (
-                                    <div className="w-full bg-bg-surface rounded-[2rem] p-8 border border-border-subtle shadow-2xl overflow-hidden relative">
-                                        <div className="absolute top-0 inset-x-0 h-1.5 primary-button-gradient"></div>
-                                        <div className="flex items-center gap-3 text-brand-500 mb-6 justify-center">
-                                            <CheckCircle2 className="w-5 h-5" />
-                                            <span className="text-sm font-bold uppercase tracking-widest">Order Extracted</span>
-                                        </div>
-                                        <div className="space-y-3 mb-6 text-left">
-                                            {parsedOrder.map((item, i) => (
-                                                <div key={i} className="flex justify-between text-base">
-                                                    <span className="font-bold text-text-primary uppercase">{item.name} <span className="text-brand-500 text-xs">x{item.quantity}</span></span>
-                                                    <span className="text-text-tertiary font-bold tracking-widest">₹{item.price * item.quantity}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="pt-4 border-t border-border-subtle flex justify-between font-bold text-xl text-text-primary italic">
-                                            <span>TOTAL</span>
-                                            <span className="text-brand-500">₹{parsedOrder.reduce((sum, item) => sum + (item.price * item.quantity), 0)}</span>
-                                        </div>
-                                    </div>
-                                ) : isListening ? (
-                                    <p className="text-text-primary font-sans text-2xl font-bold tracking-tight px-4 leading-tight">
-                                        {transcript || '"2 pani puri, 1 masala dosa..."'}
-                                    </p>
-                                ) : (
-                                    <p className="text-text-tertiary font-bold uppercase tracking-widest text-sm">
-                                        {voiceError ? <span className="text-red-500">{voiceError}</span> : 'Tap the mic and start speaking'}
-                                    </p>
-                                )}
-                            </div>
-
-                            <AnimatePresence>
-                                {parsedOrder.length > 0 && (
-                                    <motion.div 
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className="flex flex-col sm:flex-row gap-4 max-w-sm mx-auto"
-                                    >
-                                        <button 
-                                            onClick={() => { stopListening(); setShowVoiceModal(false); setParsedOrder([]); }} 
-                                            className="flex-1 py-4 rounded-xl bg-bg-surface border border-border-subtle text-text-primary font-bold uppercase tracking-widest hover:bg-bg-base transition-all"
-                                        >
-                                            Discard
-                                        </button>
-                                        <button 
-                                            onClick={() => {
-                                                setShowVoiceModal(false);
-                                                setParsedOrder([]);
-                                            }}
-                                            className="flex-1 py-4 rounded-xl primary-button-gradient text-white font-bold uppercase tracking-widest shadow-2xl shadow-brand-500/30 hover:scale-105 active:scale-95 transition-all"
-                                        >
-                                            Add to Cart
-                                        </button>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </motion.div>
-                    </motion.div>
-                )}
-
-                {showVoiceNoteModal && (
-                    <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-bg-base/95 backdrop-blur-2xl"
-                    >
-                        <motion.div 
-                            initial={{ y: '100%' }}
-                            animate={{ y: 0 }}
-                            exit={{ y: '100%' }}
-                            transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-                            className="w-full max-w-lg text-center bg-bg-surface rounded-t-[2.5rem] sm:rounded-none sm:bg-transparent p-8 sm:p-0 mt-auto sm:mt-0 relative"
-                        >
-                            <div className="w-12 h-1 bg-border-subtle rounded-full mx-auto mb-8 sm:hidden shrink-0" />
-                            <button 
-                                onClick={() => { stopNoteListening(); setShowVoiceNoteModal(false); }} 
-                                className="absolute top-4 right-4 sm:top-8 sm:right-8 w-12 h-12 flex items-center justify-center rounded-full bg-bg-surface border border-border-subtle text-text-tertiary hover:text-text-primary transition-all active:scale-90 shadow-xl"
-                            >
-                                <X className="w-6 h-6" />
-                            </button>
-
-                            <div className="mb-12">
-                                <h3 className="font-sans font-bold text-4xl text-text-primary tracking-tight mb-4 italic">Dictate Note</h3>
-                                <p className="text-yellow-500 font-bold uppercase tracking-widest text-xs">
-                                    Listening in {user.language === 'en' ? 'English' : user.language === 'hi' ? 'Hindi' : user.language === 'ta' ? 'Tamil' : 'Kannada'}
-                                </p>
-                            </div>
-                            
-                            <div className="relative mx-auto w-64 h-64 mb-16 flex items-center justify-center">
-                                {isNoteListening && (
-                                    <>
-                                        <motion.div 
-                                            animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0.1, 0.3] }}
-                                            transition={{ repeat: Infinity, duration: 2 }}
-                                            className="absolute inset-0 bg-yellow-500/20 rounded-full"
-                                        />
-                                        <motion.div 
-                                            animate={{ scale: [1, 2, 1], opacity: [0.2, 0, 0.2] }}
-                                            transition={{ repeat: Infinity, duration: 2.5 }}
-                                            className="absolute inset-0 bg-yellow-500/10 rounded-full"
-                                        />
-                                    </>
-                                )}
-                                <button 
-                                    onClick={() => isNoteListening ? stopNoteListening() : startNoteListening()}
-                                    className={cn(
-                                        "relative z-10 w-48 h-48 rounded-full flex items-center justify-center text-white transition-all shadow-[0_0_60px_rgba(234,179,8,0.3)] hover:shadow-[0_0_80px_rgba(234,179,8,0.5)] active:scale-90 ring-8 ring-yellow-500/10",
-                                        isNoteListening ? "bg-gradient-to-tr from-yellow-600 to-yellow-400" : "bg-bg-surface border-4 border-border-subtle"
-                                    )}
-                                >
-                                    <MessageCircle className={cn("w-20 h-20", isNoteListening ? "animate-pulse text-white" : "text-yellow-500")} />
-                                </button>
-                            </div>
-                            
-                            {isNoteListening && (
-                                <div className="mb-8 w-full max-w-sm mx-auto">
-                                    <AudioVisualizer isRecording={isNoteListening} color="#EAB308" />
-                                </div>
-                            )}
-
-                            <div className="max-w-md mx-auto min-h-40 flex flex-col items-center justify-center mb-12">
-                                {(isNoteListening || editableNote) ? (
-                                    <textarea 
-                                        className="w-full bg-bg-base border border-border-subtle rounded-2xl p-4 text-text-primary font-medium focus:outline-none focus:border-yellow-500 transition-colors resize-none text-center"
-                                        rows={4}
-                                        value={editableNote}
-                                        onChange={(e) => setEditableNote(e.target.value)}
-                                        placeholder="Listening for your note..."
-                                    />
-                                ) : (
-                                    <p className="text-text-tertiary font-bold uppercase tracking-widest text-sm">
-                                        {noteError ? <span className="text-red-500">{noteError}</span> : 'Tap the button and dictate'}
-                                    </p>
-                                )}
-                            </div>
-                            
-                            <AnimatePresence>
-                                {editableNote && !isNoteListening && (
-                                    <motion.div 
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className="flex flex-col sm:flex-row gap-4 max-w-sm mx-auto"
-                                    >
-                                        <button 
-                                            onClick={() => { setEditableNote(''); setShowVoiceNoteModal(false); }} 
-                                            className="flex-1 py-4 rounded-xl bg-bg-surface border border-border-subtle text-text-primary font-bold uppercase tracking-widest hover:bg-bg-base transition-all"
-                                        >
-                                            Discard
-                                        </button>
-                                        <button 
-                                            onClick={handleSaveNote}
-                                            className="flex-1 py-4 rounded-xl bg-yellow-500 text-white font-bold uppercase tracking-widest shadow-2xl shadow-yellow-500/30 hover:scale-105 active:scale-95 transition-all"
-                                        >
-                                            Save Note
-                                        </button>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
                         </motion.div>
                     </motion.div>
                 )}

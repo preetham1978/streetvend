@@ -29,8 +29,8 @@ export default function UpgradeModal({
     const targetConfig = TIER_CONFIGS[requiredTier] || TIER_CONFIGS.starter;
 
     return (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in overflow-y-auto">
-            <div className="bg-[#141416] border border-[#28282e] rounded-t-3xl sm:rounded-3xl p-6 sm:p-8 w-full max-w-2xl shadow-2xl relative my-0 sm:my-8 mt-auto sm:mt-auto">
+        <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in overflow-hidden">
+            <div className="bg-[#141416] border border-[#28282e] rounded-t-3xl sm:rounded-3xl p-6 sm:p-8 w-full max-w-2xl shadow-2xl relative my-0 sm:my-8 mt-auto sm:mt-auto max-h-[92vh] overflow-y-auto overflow-x-hidden scrollbar-hide pb-10 sm:pb-8">
                 <div className="w-12 h-1 bg-[#28282e] rounded-full mx-auto mb-6 sm:hidden shrink-0" />
                 {/* Close Button */}
                 <button

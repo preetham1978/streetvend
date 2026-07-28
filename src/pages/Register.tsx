@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Store, Check, ArrowRight, ChevronLeft, User, Phone, Mail, MapPin, Package } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -11,8 +11,14 @@ import { PLANS_CONFIG, PlanTier } from '../config/pricing';
 export default function Register() {
     const { t } = useI18n();
     const [step, setStep] = useState(1);
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [otp, setOtp] = useState(['', '', '', '', '', '', '', '']);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [errorMsg, setErrorMsg] = useState('');
+    const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+    
     const navigate = useNavigate();
-    const { login } = useAuth();
+    const { loginWithEmail, verifyOtp } = useAuth();
     
     // Form State
     const [storeName, setStoreName] = useState('');
@@ -32,61 +38,150 @@ export default function Register() {
 
     const plans = Object.values(PLANS_CONFIG);
 
-    const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
+    const handleStartRegistration = async (e: React.FormEvent) => {
         e.preventDefault();
+        setErrorMsg('');
         
-        const cleanPhoneDigits = phone.replace(/\D/g, '');
-        if (cleanPhoneDigits.length !== 10) {
-            alert('Please enter a valid 10-digit mobile number');
+        if (!email || !email.includes('@')) {
+            setErrorMsg('Valid email is required for registration');
             return;
         }
-        
-        const newVendorDb = {
-            id: 'v_' + Math.random().toString(36).substring(2, 9),
-            name: storeName,
-            owner_name: ownerName,
-            phone,
-            email: email || null,
-            category,
-            address: `${address}, ${city}`,
-            subscription: plan,
-            is_active: true,
-            created_at: new Date().toISOString()
-        };
 
-        if (supabase) {
-            try {
-                const { error } = await (supabase.from('vendors') as any).insert([newVendorDb]);
-                if (error) {
-                    console.error("Supabase insert error:", error);
-                }
-            } catch (err) {
-                console.error("Supabase registration exception:", err);
-            }
+        setIsSubmitting(true);
+        try {
+            await loginWithEmail(email);
+            setIsVerifying(true);
+        } catch (err: any) {
+            setErrorMsg(err?.message || 'Failed to send verification code');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleVerifyAndComplete = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setErrorMsg('');
+        const token = otp.join('');
+        if (token.length !== 8) {
+            setErrorMsg('Enter 8-digit verification code');
+            return;
         }
 
-        const newVendorMock = {
-            id: String(mockDb.vendors.length + 1),
-            storeName,
-            ownerName,
-            phone,
-            email,
-            category,
-            plan: plan as PlanTier,
-            subPaid: (PLANS_CONFIG[plan as PlanTier] || PLANS_CONFIG.free).monthlyPrice,
-            isActive: true,
-            qrCodeUrl: null,
-            language: 'en' as const,
-            createdAt: new Date().toISOString()
-        };
-        mockDb.vendors.push(newVendorMock);
+        setIsSubmitting(true);
+        try {
+            // 1. Verify OTP (creates auth session)
+            const { data, error: verifyError } = await (supabase?.auth.verifyOtp({
+                email,
+                token,
+                type: 'email'
+            }) as any);
 
-        await login(phone);
-        navigate('/dashboard');
+            if (verifyError || !data?.user) throw verifyError || new Error("Verification failed");
+
+            const authUser = data.user;
+
+            // 2. Create Vendor Row
+            const newVendorDb = {
+                id: 'v_' + Math.random().toString(36).substring(2, 9),
+                user_id: authUser.id,
+                name: storeName,
+                owner_name: ownerName,
+                phone,
+                email: email,
+                category,
+                address: `${address}, ${city}`,
+                subscription: plan,
+                is_active: true,
+                created_at: new Date().toISOString()
+            };
+
+            if (supabase) {
+                const { error } = await (supabase.from('vendors') as any).insert([newVendorDb]);
+                if (error) throw error;
+            }
+
+            navigate('/dashboard');
+        } catch (err: any) {
+            setErrorMsg(err?.message || 'Verification or registration failed');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleOtpChange = (index: number, val: string) => {
+        if (isNaN(Number(val))) return;
+        const newOtp = [...otp];
+        newOtp[index] = val.substring(val.length - 1);
+        setOtp(newOtp);
+        if (val && index < 7) otpRefs.current[index + 1]?.focus();
+    };
+
+    const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Backspace' && !otp[index] && index > 0) otpRefs.current[index - 1]?.focus();
     };
 
     const nextStep = () => setStep(prev => Math.min(3, prev + 1));
     const prevStep = () => setStep(prev => Math.max(1, prev - 1));
+
+    if (isVerifying) {
+        return (
+            <div className="min-h-screen flex items-center justify-center py-20 px-4 bg-bg-base relative overflow-hidden">
+                <div className="absolute inset-0 hero-glow opacity-30 pointer-events-none"></div>
+                <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="max-w-md w-full bg-bg-surface rounded-[2.5rem] p-10 border border-border-subtle shadow-2xl z-10"
+                >
+                    <div className="text-center mb-8">
+                        <div className="w-16 h-16 bg-brand-500/10 rounded-2xl flex items-center justify-center text-brand-500 mx-auto mb-6 border border-brand-500/20">
+                            <Mail className="w-8 h-8" />
+                        </div>
+                        <h2 className="text-2xl font-display font-bold text-text-primary mb-2">Verify Your Email</h2>
+                        <p className="text-xs text-text-tertiary font-bold uppercase tracking-widest">Sent to {email}</p>
+                    </div>
+
+                    {errorMsg && (
+                        <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-semibold text-center">
+                            {errorMsg}
+                        </div>
+                    )}
+
+                    <form onSubmit={handleVerifyAndComplete} className="space-y-8">
+                        <div className="grid grid-cols-8 gap-1 sm:gap-2">
+                            {otp.map((digit, i) => (
+                                <input
+                                    key={i}
+                                    type="text"
+                                    maxLength={1}
+                                    value={digit}
+                                    ref={(el) => { otpRefs.current[i] = el; }}
+                                    onChange={(e) => handleOtpChange(i, e.target.value)}
+                                    onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                                    className="w-full h-12 sm:h-14 text-center rounded-xl border border-border-subtle bg-bg-base text-text-primary font-bold text-lg sm:text-xl focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all"
+                                />
+                            ))}
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="w-full py-4 rounded-xl primary-button-gradient text-white font-bold uppercase tracking-widest shadow-xl disabled:opacity-50 transition-all"
+                        >
+                            {isSubmitting ? 'Finalizing...' : 'Verify & Launch Store'}
+                        </button>
+                        
+                        <button
+                            type="button"
+                            onClick={() => setIsVerifying(false)}
+                            className="w-full text-center text-xs text-text-tertiary font-bold uppercase hover:text-text-primary transition-colors"
+                        >
+                            ← Back to Form
+                        </button>
+                    </form>
+                </motion.div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen flex flex-col py-20 px-4 sm:px-6 lg:px-8 bg-bg-base relative overflow-hidden">
@@ -134,7 +229,7 @@ export default function Register() {
                 >
                     <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-brand-500/5 rounded-full blur-3xl"></div>
                     
-                    <form onSubmit={step === 3 ? handleRegister : (e) => { e.preventDefault(); nextStep(); }}>
+                    <form onSubmit={step === 3 ? handleStartRegistration : (e) => { e.preventDefault(); nextStep(); }}>
                         <AnimatePresence mode="wait">
                             {step === 1 && (
                                 <motion.div 
@@ -169,15 +264,17 @@ export default function Register() {
                                                 icon={<Phone className="w-5 h-5" />} 
                                             />
                                             <InputField 
-                                                label="EMAIL (OPTIONAL)" 
+                                                label="EMAIL (REQUIRED)" 
                                                 value={email} 
                                                 onChange={setEmail} 
                                                 placeholder="you@email.com" 
                                                 type="email"
+                                                required
                                                 icon={<Mail className="w-5 h-5" />} 
                                             />
                                         </div>
                                     </div>
+                                    {errorMsg && <p className="text-red-500 text-xs font-bold text-center uppercase tracking-widest">{errorMsg}</p>}
                                 </motion.div>
                             )}
 
@@ -284,9 +381,10 @@ export default function Register() {
                             )}
                             <button 
                                 type="submit" 
+                                disabled={isSubmitting}
                                 className="flex-1 flex items-center justify-center gap-3 py-4 rounded-xl primary-button-gradient text-white font-bold uppercase tracking-widest shadow-2xl shadow-brand-500/20 hover:scale-[1.02] active:scale-95 transition-all"
                             >
-                                {step === 3 ? 'Complete Launch' : 'Next Step'}
+                                {isSubmitting ? 'Processing...' : step === 3 ? 'Register & Verify' : 'Next Step'}
                                 <ArrowRight className="w-5 h-5" />
                             </button>
                         </div>
@@ -303,7 +401,7 @@ export default function Register() {
     );
 }
 
-function InputField({ label, value, onChange, placeholder, type = "text", icon }: { label: string, value: string, onChange: (v: string) => void, placeholder: string, type?: string, icon: React.ReactNode }) {
+function InputField({ label, value, onChange, placeholder, type = "text", icon, required = true }: { label: string, value: string, onChange: (v: string) => void, placeholder: string, type?: string, icon: React.ReactNode, required?: boolean }) {
     return (
         <div>
             <label className="block text-[10px] font-bold text-text-tertiary mb-3 uppercase tracking-widest">{label}</label>

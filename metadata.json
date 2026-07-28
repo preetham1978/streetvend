@@ -2,7 +2,8 @@
   "name": "Streetvend: AI-Powered Vendor Platform",
   "description": "Streetvend by VeloAI is a comprehensive digital transformation platform for Indian street vendors, featuring AI-powered billing, real-time inventory management, predictive sales analytics, and voice-assisted operations for small business growth.",
   "requestFramePermissions": [
-    "microphone"
+    "microphone",
+    "camera"
   ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

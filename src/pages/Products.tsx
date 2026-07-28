@@ -2,13 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { supabase, mapProductFromDb, mockDb } from '../lib/supabase';
 import { Product } from '../lib/database.types';
 import { useAuth } from '../lib/auth';
-import { Package, Plus, Trash2, Edit2, Check, X, Search, Loader2, AlertCircle, RefreshCw, Lock } from 'lucide-react';
+import { Package, Plus, Trash2, Edit2, Check, X, Search, Loader2, AlertCircle, RefreshCw, Lock, ScanLine, Camera, Barcode, ShoppingBag } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { usePlanLimits } from '../hooks/usePlanLimits';
 import UpgradeModal from '../components/UpgradeModal';
+import QuickAddModal from '../components/QuickAddModal';
 import AutoReorderSection from '../components/AutoReorderSection';
 import StockPredictionWidget from '../components/StockPredictionWidget';
+import BarcodeScannerModal from '../components/BarcodeScannerModal';
 import { motion } from 'motion/react';
+import { PRODUCT_TEMPLATES } from '../config/productTemplates';
 
 // Indian Street Vendor Canonical Products & Aliases
 const CANONICAL_MOCK_PRODUCTS = [
@@ -78,6 +81,7 @@ export default function ProductsPage() {
     
     // Add/Edit Modal state
     const [showModal, setShowModal] = useState(false);
+    const [showQuickAddModal, setShowQuickAddModal] = useState(false);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [name, setName] = useState('');
@@ -85,8 +89,15 @@ export default function ProductsPage() {
     const [unit, setUnit] = useState('piece');
     const [category, setCategory] = useState('Snacks');
     const [stock, setStock] = useState('50');
+    const [barcode, setBarcode] = useState('');
+    const [type, setType] = useState<'product' | 'service'>('product');
     const [isSaving, setIsSaving] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
+
+    // Barcode scanner states
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
+    const [isModalScannerOpen, setIsModalScannerOpen] = useState(false);
+    const [scannedNotification, setScannedNotification] = useState<string | null>(null);
 
     // Canonical Product Duplicate Detection States
     const [canonicalProducts, setCanonicalProducts] = useState<{name: string, aliases: string[]}[]>(CANONICAL_MOCK_PRODUCTS);
@@ -197,12 +208,27 @@ export default function ProductsPage() {
     const categories = ['All', ...Array.from(new Set(products.map(p => p.category)))];
 
     const filteredProducts = products.filter(p => {
-        const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.category.toLowerCase().includes(searchQuery.toLowerCase());
+        const query = searchQuery.toLowerCase();
+        const matchesSearch = p.name.toLowerCase().includes(query) || 
+                              p.category.toLowerCase().includes(query) ||
+                              (p.barcode && p.barcode.toLowerCase().includes(query));
         const matchesCat = selectedCategory === 'All' || p.category === selectedCategory;
         return matchesSearch && matchesCat;
     });
 
-    function openAddModal() {
+    const handleMainScan = (scannedCode: string) => {
+        const found = products.find(p => (p.barcode && p.barcode.trim() === scannedCode.trim()) || p.id === scannedCode);
+        if (found) {
+            setSearchQuery(found.name);
+            setScannedNotification(`Barcode matched product: "${found.name}" (₹${found.price})`);
+        } else {
+            setSearchQuery(scannedCode);
+            setScannedNotification(`No product matched barcode "${scannedCode}". Opening Add Product modal with barcode pre-filled.`);
+            openAddModalWithBarcode(scannedCode);
+        }
+    };
+
+    const openAddModalWithBarcode = (code: string) => {
         if (!canAddProduct(products.length)) {
             setShowUpgradeModal(true);
             return;
@@ -214,8 +240,14 @@ export default function ProductsPage() {
         setUnit('piece');
         setCategory('Snacks');
         setStock('50');
+        setBarcode(code);
+        setType('product');
         setErrorMsg('');
         setShowModal(true);
+    };
+
+    function openAddModal() {
+        openAddModalWithBarcode('');
     }
 
     function openEditModal(prod: Product) {
@@ -226,6 +258,8 @@ export default function ProductsPage() {
         setUnit(prod.unit || 'piece');
         setCategory(prod.category);
         setStock(prod.stock.toString());
+        setBarcode(prod.barcode || '');
+        setType(prod.type || 'product');
         setErrorMsg('');
         setShowModal(true);
     }
@@ -247,8 +281,6 @@ export default function ProductsPage() {
             }
 
             if (supabase) {
-                // Pre-flight check: Ensure vendor exists in Supabase vendors table
-                // This prevents foreign key constraint violations for mock/new vendors
                 try {
                     const vendorData = {
                         id: vendorId,
@@ -259,28 +291,26 @@ export default function ProductsPage() {
                         subscription: user?.plan === 'professional' ? 'pro' : (user?.plan || 'free'),
                         is_active: true
                     };
-                    
-                    // Attempt to upsert vendor to ensure it exists
                     await (supabase.from('vendors') as any).upsert([vendorData], { onConflict: 'id' });
                 } catch (syncErr) {
                     console.warn("Minor: Vendor sync failed, attempting product save anyway:", syncErr);
                 }
 
                 if (editingProduct) {
-                    // Update
                     const { error } = await (supabase.from('products') as any).update({
                         name: name.trim(),
                         price: parseFloat(price),
                         unit,
                         category,
-                        stock_qty: parseInt(stock) || 0,
-                        in_stock: (parseInt(stock) || 0) > 0,
+                        stock_qty: type === 'service' ? 0 : (parseInt(stock) || 0),
+                        barcode: barcode.trim() || null,
+                        type,
+                        in_stock: type === 'service' || (parseInt(stock) || 0) > 0,
                         updated_at: new Date().toISOString()
                     }).eq('id', editingProduct.id);
 
                     if (error) throw error;
                 } else {
-                    // Insert new product
                     const newId = 'p_' + Math.random().toString(36).substring(2, 9);
                     const { error } = await (supabase.from('products') as any).insert({
                         id: newId,
@@ -289,7 +319,9 @@ export default function ProductsPage() {
                         price: parseFloat(price),
                         unit,
                         category,
-                        stock_qty: parseInt(stock) || 50,
+                        stock_qty: type === 'service' ? 0 : (parseInt(stock) || 50),
+                        barcode: barcode.trim() || null,
+                        type,
                         in_stock: true,
                         updated_at: new Date().toISOString()
                     });
@@ -297,7 +329,6 @@ export default function ProductsPage() {
                     if (error) throw error;
                 }
             } else {
-                // Mock local persistence update
                 if (editingProduct) {
                     mockDb.products = mockDb.products.map(p => p.id === editingProduct.id ? {
                         ...p,
@@ -305,7 +336,9 @@ export default function ProductsPage() {
                         price: parseFloat(price),
                         unit,
                         category,
-                        stock: parseInt(stock) || 0
+                        stock: type === 'service' ? 0 : (parseInt(stock) || 0),
+                        barcode: barcode.trim(),
+                        type
                     } : p);
                 } else {
                     const newId = 'p_' + Math.random().toString(36).substring(2, 9);
@@ -316,7 +349,9 @@ export default function ProductsPage() {
                         price: parseFloat(price),
                         unit,
                         category,
-                        stock: parseInt(stock) || 50
+                        stock: type === 'service' ? 0 : (parseInt(stock) || 50),
+                        barcode: barcode.trim(),
+                        type: type as any
                     });
                 }
             }
@@ -345,6 +380,38 @@ export default function ProductsPage() {
         setProducts(prev => prev.filter(p => p.id !== id));
     }
 
+    const getTemplateCategory = (cat: string) => {
+        if (!cat) return null;
+        const normalized = cat.trim();
+        // Exact match first
+        if (PRODUCT_TEMPLATES[normalized]) return normalized;
+        // Case-insensitive match
+        const keys = Object.keys(PRODUCT_TEMPLATES);
+        const match = keys.find(k => k.toLowerCase() === normalized.toLowerCase());
+        if (match) return match;
+
+        // Substring / fuzzy match
+        const lower = normalized.toLowerCase();
+        if (lower.includes('fruit') || lower.includes('veg') || lower.includes('produce')) return "Vegetables & Fruits";
+        if (lower.includes('grocery') || lower.includes('kirana') || lower.includes('general') || lower.includes('store')) return "Groceries";
+        if (lower.includes('dosa') || lower.includes('south') || lower.includes('idli') || lower.includes('tiffin')) return "South Indian";
+        if (lower.includes('kebab') || lower.includes('kabab') || lower.includes('grill') || lower.includes('tandoor') || lower.includes('bbq')) return "Kebab & Grill";
+        if (lower.includes('street') || lower.includes('food') || lower.includes('chaat') || lower.includes('vend')) return "Street Food";
+        if (lower.includes('meat') || lower.includes('fish') || lower.includes('sea') || lower.includes('chicken') || lower.includes('mutton')) return "Meat & Seafood";
+        if (lower.includes('laundry') || lower.includes('wash') || lower.includes('clean') || lower.includes('iron')) return "Laundry";
+        if (lower.includes('key')) return "Key Maker";
+        if (lower.includes('mobile') || lower.includes('acc') || lower.includes('phone')) return "Mobile Accessories";
+        if (lower.includes('watch') || lower.includes('repair')) return "Watch Repair's";
+        if (lower.includes('pan')) return "Pan Shop";
+        if (lower.includes('fancy')) return "Fancy Store";
+        if (lower.includes('station')) return "Stationery";
+        
+        return null;
+    };
+
+    const templateKey = user ? (getTemplateCategory(user.storeName) || getTemplateCategory(user.category)) : null;
+    const hasTemplates = !!templateKey;
+
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16">
             {/* Header */}
@@ -355,12 +422,22 @@ export default function ProductsPage() {
                     </div>
                     <h1 className="font-display font-bold text-3xl sm:text-4xl text-text-primary tracking-tight">Products & Stock</h1>
                 </div>
-                <button
-                    onClick={openAddModal}
-                    className="flex items-center justify-center gap-2 px-6 py-4 rounded-2xl primary-button-gradient text-white font-bold text-xs uppercase tracking-widest shadow-xl shadow-brand-500/20 hover:scale-[1.02] active:scale-95 transition-all w-full md:w-auto min-h-[44px]"
-                >
-                    <Plus className="w-5 h-5" /> Add Product
-                </button>
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                    {hasTemplates && (
+                        <button
+                            onClick={() => setShowQuickAddModal(true)}
+                            className="flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-bg-surface border border-brand-500/30 text-brand-500 font-bold text-xs uppercase tracking-widest shadow-xl hover:bg-brand-500/5 active:scale-95 transition-all w-full md:w-auto min-h-[44px]"
+                        >
+                            <ShoppingBag className="w-5 h-5" /> Quick Add Templates
+                        </button>
+                    )}
+                    <button
+                        onClick={openAddModal}
+                        className="flex items-center justify-center gap-2 px-6 py-4 rounded-2xl primary-button-gradient text-white font-bold text-xs uppercase tracking-widest shadow-xl shadow-brand-500/20 hover:scale-[1.02] active:scale-95 transition-all w-full md:w-auto min-h-[44px]"
+                    >
+                        <Plus className="w-5 h-5" /> Add Product
+                    </button>
+                </div>
             </div>
 
             {/* Error Banner if load failed */}
@@ -379,17 +456,43 @@ export default function ProductsPage() {
                 </div>
             )}
 
+            {/* Scanned notification banner */}
+            {scannedNotification && (
+                <div className="mb-6 p-4 rounded-2xl bg-brand-500/15 border border-brand-500/30 text-brand-400 text-xs font-bold flex items-center justify-between animate-fade-in">
+                    <div className="flex items-center gap-2">
+                        <ScanLine className="w-4 h-4 text-brand-500 shrink-0" />
+                        <span>{scannedNotification}</span>
+                    </div>
+                    <button
+                        onClick={() => setScannedNotification(null)}
+                        className="text-text-tertiary hover:text-text-primary p-1"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
+
             {/* Filters & Search */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
-                <div className="relative w-full sm:w-80">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
-                    <input
-                        type="text"
-                        placeholder="Search products..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-11 pr-4 py-3 rounded-2xl bg-bg-surface border border-border-subtle text-text-primary font-medium focus:outline-none focus:border-brand-500 transition-colors text-sm"
-                    />
+                <div className="flex items-center gap-2 w-full sm:w-auto flex-1 max-w-md">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
+                        <input
+                            type="text"
+                            placeholder="Search name, category, or barcode..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-11 pr-4 py-3 rounded-2xl bg-bg-surface border border-border-subtle text-text-primary font-medium focus:outline-none focus:border-brand-500 transition-colors text-sm"
+                        />
+                    </div>
+                    <button
+                        onClick={() => setIsScannerOpen(true)}
+                        title="Scan Barcode to Lookup Product"
+                        className="px-4 py-3 rounded-2xl bg-brand-500/10 border border-brand-500/30 text-brand-500 hover:bg-brand-500 hover:text-white transition-all font-bold text-xs flex items-center gap-2 shrink-0 cursor-pointer shadow-sm"
+                    >
+                        <Camera className="w-4 h-4" />
+                        <span className="hidden xs:inline">Scan Barcode</span>
+                    </button>
                 </div>
 
                 <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0 scrollbar-hide">
@@ -420,13 +523,23 @@ export default function ProductsPage() {
                 <div className="bg-bg-surface rounded-3xl border border-border-subtle p-16 text-center shadow-xl">
                     <Package className="w-16 h-16 text-text-tertiary mx-auto mb-4 opacity-30" />
                     <h3 className="font-bold text-lg text-text-primary uppercase tracking-widest mb-2">No products found</h3>
-                    <p className="text-text-secondary text-sm mb-6">Add your first product to start taking orders and managing inventory.</p>
-                    <button
-                        onClick={openAddModal}
-                        className="px-6 py-3 rounded-xl primary-button-gradient text-white font-bold text-xs uppercase tracking-widest shadow-lg"
-                    >
-                        Add Product Now
-                    </button>
+                    <p className="text-text-secondary text-sm mb-8">Add your first product to start taking orders and managing inventory.</p>
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                        {hasTemplates && (
+                            <button
+                                onClick={() => setShowQuickAddModal(true)}
+                                className="px-8 py-4 rounded-2xl bg-brand-500/10 border border-brand-500/30 text-brand-500 font-bold text-xs uppercase tracking-widest shadow-lg hover:bg-brand-500/20 transition-all flex items-center gap-2"
+                            >
+                                <ShoppingBag className="w-4 h-4" /> Quick Add from Templates
+                            </button>
+                        )}
+                        <button
+                            onClick={openAddModal}
+                            className="px-8 py-4 rounded-2xl primary-button-gradient text-white font-bold text-xs uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all"
+                        >
+                            Add Custom Product
+                        </button>
+                    </div>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -435,9 +548,17 @@ export default function ProductsPage() {
                             <div>
                                 <div className="flex items-start justify-between gap-4 mb-4">
                                     <div>
-                                        <span className="text-[10px] font-bold text-brand-500 uppercase tracking-widest bg-brand-500/10 px-2.5 py-1 rounded-full inline-block mb-2">
-                                            {p.category}
-                                        </span>
+                                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                            <span className="text-[10px] font-bold text-brand-500 uppercase tracking-widest bg-brand-500/10 px-2.5 py-1 rounded-full inline-block">
+                                                {p.category}
+                                            </span>
+                                            {p.barcode && (
+                                                <span className="text-[10px] font-mono font-bold text-text-tertiary bg-bg-base border border-border-subtle px-2 py-0.5 rounded-md flex items-center gap-1">
+                                                    <Barcode className="w-3 h-3 text-brand-500" />
+                                                    {p.barcode}
+                                                </span>
+                                            )}
+                                        </div>
                                         <h3 className="font-bold text-lg text-text-primary tracking-tight">{p.name}</h3>
                                     </div>
                                     <div className="text-right">
@@ -446,10 +567,16 @@ export default function ProductsPage() {
                                     </div>
                                 </div>
                                 <div className="flex items-center justify-between text-xs font-medium text-text-secondary py-3 border-t border-border-subtle mb-4">
-                                    <span>Stock Quantity: <strong className="text-brand-500 font-sans font-extrabold not-italic">{p.stock} {p.unit || 'piece'}(s)</strong></span>
-                                    <span className={cn("px-2 py-0.5 rounded-full font-bold uppercase text-[9px]", p.stock > 0 ? "bg-accent-green/10 text-accent-green" : "bg-red-500/10 text-red-500")}>
-                                        {p.stock > 0 ? 'In Stock' : 'Out of Stock'}
-                                    </span>
+                                    {p.type === 'service' ? (
+                                        <span className="text-text-tertiary italic">Service / Labor Only</span>
+                                    ) : (
+                                        <>
+                                            <span>Stock Quantity: <strong className="text-brand-500 font-sans font-extrabold not-italic">{p.stock} {p.unit || 'piece'}(s)</strong></span>
+                                            <span className={cn("px-2 py-0.5 rounded-full font-bold uppercase text-[9px]", p.stock > 0 ? "bg-accent-green/10 text-accent-green" : "bg-red-500/10 text-red-500")}>
+                                                {p.stock > 0 ? 'In Stock' : 'Out of Stock'}
+                                            </span>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 pt-2">
@@ -495,8 +622,31 @@ export default function ProductsPage() {
                         )}
 
                         <form onSubmit={handleSave} className="space-y-4">
+                            <div className="flex gap-2 p-1 bg-bg-base rounded-2xl border border-border-subtle mb-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setType('product')}
+                                    className={cn(
+                                        "flex-1 py-2 px-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
+                                        type === 'product' ? "bg-brand-500 text-white shadow-lg shadow-brand-500/20" : "text-text-tertiary hover:text-text-primary"
+                                    )}
+                                >
+                                    Product
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setType('service')}
+                                    className={cn(
+                                        "flex-1 py-2 px-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
+                                        type === 'service' ? "bg-brand-500 text-white shadow-lg shadow-brand-500/20" : "text-text-tertiary hover:text-text-primary"
+                                    )}
+                                >
+                                    Service
+                                </button>
+                            </div>
+
                             <div>
-                                <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest mb-2">Product Name</label>
+                                <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest mb-2">Item Name</label>
                                 <input
                                     type="text"
                                     required
@@ -551,13 +701,21 @@ export default function ProductsPage() {
                                         <option value="piece">Piece</option>
                                         <option value="plate">Plate</option>
                                         <option value="kg">Kg</option>
+                                        <option value="g">Grams</option>
                                         <option value="packet">Packet</option>
                                         <option value="bottle">Bottle</option>
+                                        <option value="litre">Litre</option>
+                                        <option value="bunch">Bunch</option>
+                                        <option value="service">Service</option>
+                                        <option value="pair">Pair</option>
+                                        <option value="set">Set</option>
+                                        <option value="cup">Cup</option>
+                                        <option value="dozen">Dozen</option>
                                     </select>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className={cn("grid gap-4", type === 'product' ? "grid-cols-2" : "grid-cols-1")}>
                                 <div>
                                     <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest mb-2">Category</label>
                                     <input
@@ -569,18 +727,46 @@ export default function ProductsPage() {
                                         className="w-full px-4 py-3.5 rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-medium focus:outline-none focus:border-brand-500 transition-colors text-sm"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest mb-2">Stock Qty</label>
-                                    <input
-                                        type="number"
-                                        required
-                                        placeholder="50"
-                                        value={stock}
-                                        onChange={(e) => setStock(e.target.value)}
-                                        className="w-full px-4 py-3.5 rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-medium focus:outline-none focus:border-brand-500 transition-colors text-sm"
-                                    />
-                                </div>
+                                {type === 'product' && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest mb-2">Stock Qty</label>
+                                        <input
+                                            type="number"
+                                            required
+                                            placeholder="50"
+                                            value={stock}
+                                            onChange={(e) => setStock(e.target.value)}
+                                            className="w-full px-4 py-3.5 rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-medium focus:outline-none focus:border-brand-500 transition-colors text-sm"
+                                        />
+                                    </div>
+                                )}
                             </div>
+
+                            {type === 'product' && (
+                                <div>
+                                    <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest mb-2">Barcode / EAN (Optional)</label>
+                                    <div className="flex gap-2">
+                                        <div className="relative flex-1">
+                                            <Barcode className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. 8901234567890"
+                                                value={barcode}
+                                                onChange={(e) => setBarcode(e.target.value)}
+                                                className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-mono text-sm focus:outline-none focus:border-brand-500 transition-colors"
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsModalScannerOpen(true)}
+                                            className="px-4 py-3.5 rounded-2xl bg-brand-500/10 border border-brand-500/30 text-brand-500 hover:bg-brand-500 hover:text-white transition-all font-bold text-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
+                                        >
+                                            <Camera className="w-4 h-4" />
+                                            <span>Scan</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="flex gap-4 pt-4">
                                 <button
@@ -614,12 +800,41 @@ export default function ProductsPage() {
                 <AutoReorderSection products={products} />
             </div>
 
+            {/* Quick Add Modal */}
+            {user && templateKey && (
+                <QuickAddModal
+                    isOpen={showQuickAddModal}
+                    onClose={() => setShowQuickAddModal(false)}
+                    vendor={user}
+                    templateKey={templateKey}
+                    onSuccess={fetchProducts}
+                    canAddProduct={canAddProduct}
+                    currentProductCount={products.length}
+                />
+            )}
+
             <UpgradeModal
                 isOpen={showUpgradeModal}
                 onClose={() => setShowUpgradeModal(false)}
                 featureName="Unlimited Catalog Products"
                 requiredTier="starter"
                 message="Free tier allows up to 20 products in your catalog. Upgrade to Starter (₹299/mo) or higher to manage unlimited products."
+            />
+
+            {/* Header / Lookup Barcode Scanner */}
+            <BarcodeScannerModal
+                isOpen={isScannerOpen}
+                onClose={() => setIsScannerOpen(false)}
+                onScan={handleMainScan}
+                title="Scan Barcode to Lookup Product"
+            />
+
+            {/* Modal Input Barcode Scanner */}
+            <BarcodeScannerModal
+                isOpen={isModalScannerOpen}
+                onClose={() => setIsModalScannerOpen(false)}
+                onScan={(code) => setBarcode(code)}
+                title="Scan Barcode for Product Form"
             />
         </div>
     );

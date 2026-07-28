@@ -15,14 +15,16 @@ const DEFAULT_INVENTORY_METRICS = [
 ];
 
 export default function StockPredictionWidget({ products }: StockPredictionWidgetProps) {
-    const items = products ? products.map(p => ({
-        name: p.name,
-        current: p.stock,
-        capacity: 500, // Assuming a reasonable capacity
-        status: p.stock < 10 ? 'critical' : p.stock < 30 ? 'low' : 'good',
-        depletionDays: p.stock > 0 ? (p.stock / 5).toFixed(1) : 0, // Mock depletion rate
-        speed: p.stock > 30 ? 'Slow Moving' : 'Fast Moving'
-    })) : [];
+    const items = products ? products
+        .filter(p => p.type !== 'service')
+        .map(p => ({
+            name: p.name,
+            current: p.stock,
+            capacity: 500, // Assuming a reasonable capacity
+            status: p.stock < 10 ? 'critical' : p.stock < 30 ? 'low' : 'good',
+            depletionDays: p.stock > 0 ? (p.stock / 5).toFixed(1) : 0, // Mock depletion rate
+            speed: p.stock > 30 ? 'Slow Moving' : 'Fast Moving'
+        })) : [];
 
     return (
         <GatedChartWrapper

@@ -6,9 +6,11 @@ interface AuthContextType {
     user: Vendor | null;
     session: any;
     loading: boolean;
-    isLoading: boolean; // Backwards compatibility
-    login: (phone: string) => Promise<Vendor>;
-    logout: () => void; // Backwards compatibility
+    isLoading: boolean;
+    loginWithEmail: (email: string) => Promise<void>;
+    verifyOtp: (email: string, token: string) => Promise<Vendor>;
+    login: (email: string) => Promise<Vendor>; // Kept for transition/demo
+    logout: () => void;
     signOut: () => Promise<void>;
     isAdmin: boolean;
     loginAdmin: () => void;
@@ -25,98 +27,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [isAdmin, setIsAdmin] = useState(false);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-    const fetchVendorProfile = async (phone: string): Promise<Vendor> => {
-        const cleanPhone = phone.trim();
-        const digitsOnly = cleanPhone.replace(/\D/g, '');
-
+    const fetchVendorProfile = async (userId: string): Promise<Vendor | null> => {
         if (supabase) {
             try {
                 const { data, error } = await supabase
                     .from('vendors')
-                    .select('*');
-                if (data && !error && data.length > 0) {
-                    const matched = data.find((v: any) => {
-                        const vPhoneDigits = (v.phone || '').replace(/\D/g, '');
-                        return v.phone === cleanPhone || (digitsOnly && vPhoneDigits.includes(digitsOnly));
-                    });
-                    if (matched) {
-                        const vendor = mapVendorFromDb(matched);
-                        setUser(vendor);
-                        localStorage.setItem('vendor_user', JSON.stringify(vendor));
-                        return vendor;
-                    }
+                    .select('*')
+                    .eq('user_id', userId)
+                    .single();
+                
+                if (data && !error) {
+                    const vendor = mapVendorFromDb(data);
+                    setUser(vendor);
+                    localStorage.setItem('vendor_user', JSON.stringify(vendor));
+                    return vendor;
                 }
             } catch (err) {
                 console.error("Supabase load user profile error:", err);
             }
         }
-
-        // Fallback to mockDb
-        let vendor = mockDb.vendors.find(v => {
-            const vDigits = v.phone.replace(/\D/g, '');
-            return v.phone === cleanPhone || (digitsOnly && vDigits.endsWith(digitsOnly)) || (digitsOnly && digitsOnly.endsWith(vDigits));
-        }) as Vendor | undefined;
-
-        if (!vendor) {
-            vendor = {
-                id: 'v_' + Math.random().toString(36).substring(2, 9),
-                storeName: "Streetvend Partner",
-                ownerName: "Vendor",
-                phone: cleanPhone || "+919876543210",
-                category: "Street Food",
-                plan: "free",
-                subPaid: 0,
-                isActive: true,
-                qrCodeUrl: null,
-                language: "en",
-                createdAt: new Date().toISOString()
-            };
-            mockDb.vendors.push(vendor);
-        }
-
-        // If using Supabase, ensure the vendor (including mock/new ones) exists in the database
-        // so that foreign key constraints (like in products table) don't fail.
-        if (supabase) {
-            try {
-                const newVendorDb = {
-                    id: vendor.id,
-                    name: vendor.storeName,
-                    owner_name: vendor.ownerName,
-                    phone: vendor.phone,
-                    email: vendor.email || null,
-                    category: vendor.category,
-                    subscription: vendor.plan === 'professional' ? 'pro' : vendor.plan,
-                    is_active: true,
-                    created_at: vendor.createdAt
-                };
-                
-                // We use upsert to avoid duplicate errors if it was just added or existed
-                const { error: insertError } = await (supabase.from('vendors') as any).upsert([newVendorDb], { onConflict: 'id' });
-                if (insertError) {
-                    console.error("Failed to sync vendor to Supabase:", insertError);
-                }
-            } catch (syncErr) {
-                console.error("Exception syncing vendor to Supabase:", syncErr);
-            }
-        }
-
-        setUser(vendor);
-        localStorage.setItem('vendor_user', JSON.stringify(vendor));
-        return vendor;
+        return null;
     };
 
     useEffect(() => {
         if (supabase) {
-            // Get initial session
             supabase.auth.getSession().then(({ data: { session } }) => {
                 setSession(session);
                 if (session?.user) {
                     setIsSuperAdmin(session.user.user_metadata?.role === 'superadmin');
-                    fetchVendorProfile(session.user.phone || '').finally(() => {
+                    fetchVendorProfile(session.user.id).finally(() => {
                         setLoading(false);
                     });
                 } else {
-                    // Fallback to localStorage for mock session
                     const storedUser = localStorage.getItem('vendor_user');
                     if (storedUser) {
                         try {
@@ -129,15 +71,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
             });
 
-            // Listen for auth changes
             const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
                 setSession(newSession);
                 if (newSession?.user) {
                     setIsSuperAdmin(newSession.user.user_metadata?.role === 'superadmin');
-                    await fetchVendorProfile(newSession.user.phone || '');
+                    await fetchVendorProfile(newSession.user.id);
                 } else {
                     setIsSuperAdmin(false);
-                    // Only clear user if there is no local mock user
                     const hasMockUser = localStorage.getItem('vendor_user');
                     if (!hasMockUser) {
                         setUser(null);
@@ -155,7 +95,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 subscription.unsubscribe();
             };
         } else {
-            // No Supabase, load from localStorage
             const storedUser = localStorage.getItem('vendor_user');
             if (storedUser) {
                 try {
@@ -172,12 +111,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    const login = async (phone: string): Promise<Vendor> => {
-        // Clear any active admin session when logging in as vendor
+    const loginWithEmail = async (email: string) => {
+        if (!supabase) throw new Error("Supabase not initialized");
+        // Phase 2: replace/augment with WhatsApp OTP via MSG91
+        // when Meta WhatsApp Business API approval is complete
+        
+        // IMPORTANT: To receive a 6-digit numeric OTP instead of a Magic Link:
+        // 1. Go to Supabase Dashboard -> Authentication -> Providers -> Email
+        // 2. Ensure "Enable Email OTP" is toggled ON
+        // 3. Toggle "Confirm Email" to OFF (this ensures codes are sent for verification)
+        // 4. Ensure the Email Template for "OTP" uses {{ .Token }}
+        const { error } = await supabase.auth.signInWithOtp({ 
+            email,
+            options: {
+                shouldCreateUser: true
+                // We explicitly omit emailRedirectTo to favor the numeric OTP code delivery
+            }
+        });
+        if (error) throw error;
+    };
+
+    const verifyOtp = async (email: string, token: string): Promise<Vendor> => {
+        if (!supabase) throw new Error("Supabase not initialized");
+        const { data, error } = await supabase.auth.verifyOtp({
+            email,
+            token,
+            type: 'email'
+        });
+        
+        if (error) throw error;
+        if (!data.user) throw new Error("No user returned");
+
+        const profile = await fetchVendorProfile(data.user.id);
+        if (!profile) {
+            throw new Error("Vendor profile not found. Please register.");
+        }
+        return profile;
+    };
+
+    const login = async (email: string): Promise<Vendor> => {
+        // Mock/Legacy login - kept for transition
         setIsAdmin(false);
         localStorage.removeItem('vendor_admin');
-        const vendor = await fetchVendorProfile(phone);
-        return vendor;
+        
+        if (supabase && session?.user) {
+            const profile = await fetchVendorProfile(session.user.id);
+            if (profile) return profile;
+        }
+
+        const vendor = mockDb.vendors.find(v => v.email === email) as Vendor;
+        if (vendor) {
+            setUser(vendor);
+            localStorage.setItem('vendor_user', JSON.stringify(vendor));
+            return vendor;
+        }
+        throw new Error("User not found");
     };
 
     const signOut = async () => {
@@ -240,6 +228,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             session, 
             loading, 
             isLoading: loading, 
+            loginWithEmail,
+            verifyOtp,
             login, 
             logout, 
             signOut, 

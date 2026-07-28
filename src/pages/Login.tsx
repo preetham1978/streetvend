@@ -16,11 +16,11 @@ import { supabase } from '../lib/supabase';
 
 export default function Login() {
     const { t } = useI18n();
-    const { login } = useAuth();
+    const { loginWithEmail, verifyOtp, login } = useAuth();
     const navigate = useNavigate();
 
-    const [phone, setPhone] = useState('');
-    const [otp, setOtp] = useState(['', '', '', '', '', '']);
+    const [email, setEmail] = useState('');
+    const [otp, setOtp] = useState(['', '', '', '', '', '', '', '']);
     const [step, setStep] = useState<'request' | 'verify'>('request');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [countdown, setCountdown] = useState(0);
@@ -29,15 +29,34 @@ export default function Login() {
 
     const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-    const demoAccounts = [
-        { name: "Raju's Chaat Corner", phone: "+919876543210" },
-        { name: "Fresh Green Organics", phone: "+919876543211" },
-        { name: "Al-Noor Meat Shop", phone: "+919876543212" },
-        { name: "Aunty's Dosa Point", phone: "+919876543214" },
-        { name: "Preetham's Kabab", phone: "+917092006655" },
-        { name: "Sai Kirana Store", phone: "+919876543213" },
-        { name: "Preetham's Kebab", phone: "+919900112233" }
-    ];
+    const [demoAccounts, setDemoAccounts] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchDemoAccounts = async () => {
+            if (supabase) {
+                const { data, error } = await supabase
+                    .from('vendors')
+                    .select('name, email')
+                    .limit(7);
+                
+                if (data && !error) {
+                    setDemoAccounts(data);
+                } else {
+                    // Fallback to hardcoded list if DB is empty or fails
+                    setDemoAccounts([
+                        { name: "Raju's Chaat Corner", email: "raju@example.com" },
+                        { name: "Fresh Green Organics", email: "meena@example.com" },
+                        { name: "Al-Noor Meat Shop", email: "ahmed@example.com" },
+                        { name: "Aunty's Dosa Point", email: "lakshmi@example.com" },
+                        { name: "Preetham's Kabab", email: "preetham@example.com" },
+                        { name: "Sai Kirana Store", email: "suresh@example.com" },
+                        { name: "Preetham's Kebab", email: "preetham.demo@example.com" }
+                    ]);
+                }
+            }
+        };
+        fetchDemoAccounts();
+    }, []);
 
     useEffect(() => {
         if (countdown > 0) {
@@ -51,45 +70,24 @@ export default function Login() {
         setErrorMsg('');
         setInfoMsg('');
 
-        // Normalize phone number to include +91
-        const cleanPhoneDigits = phone.replace(/\D/g, '');
-        if (cleanPhoneDigits.length !== 10) {
-            setErrorMsg('Please enter a valid 10-digit mobile number');
+        if (!email || !email.includes('@')) {
+            setErrorMsg('Please enter a valid email address');
             return;
         }
 
-        const fullPhoneNumber = `+91${cleanPhoneDigits}`;
         setIsSubmitting(true);
 
-        if (supabase) {
-            try {
-                const { error } = await supabase.auth.signInWithOtp({
-                    phone: fullPhoneNumber,
-                });
-
-                if (error) {
-                    if (error.message.includes('rate limit') || error.status === 429) {
-                        setErrorMsg('Too many attempts. Please try again later.');
-                    } else {
-                        setErrorMsg(error.message);
-                    }
-                } else {
-                    setStep('verify');
-                    setCountdown(30);
-                    setInfoMsg(`OTP sent successfully to ${fullPhoneNumber}`);
-                    setTimeout(() => otpRefs.current[0]?.focus(), 100);
-                }
-            } catch (err: any) {
-                setErrorMsg(err?.message || 'Error sending OTP. Please try again.');
-            } finally {
-                setIsSubmitting(false);
-            }
-        } else {
-            // Mock Fallback
+        try {
+            await loginWithEmail(email);
             setStep('verify');
-            setCountdown(30);
-            setInfoMsg(`[Mock Mode] OTP sent to ${fullPhoneNumber}. (Enter any digits to proceed)`);
+            setCountdown(60);
+            setInfoMsg(`OTP sent successfully to ${email}`);
             setTimeout(() => otpRefs.current[0]?.focus(), 100);
+        } catch (err: any) {
+            console.error('OTP Send Error:', err);
+            const message = err?.message || err?.error_description || (typeof err === 'string' ? err : JSON.stringify(err));
+            setErrorMsg(message === '{}' ? 'Failed to send OTP. Check your Supabase/Resend configuration.' : message);
+        } finally {
             setIsSubmitting(false);
         }
     };
@@ -100,45 +98,21 @@ export default function Login() {
         setInfoMsg('');
 
         const token = otp.join('');
-        if (token.length !== 6) {
-            setErrorMsg('Please enter all 6 digits of the OTP');
+        if (token.length !== 8) {
+            setErrorMsg('Please enter all 8 digits of the OTP');
             return;
         }
 
-        const cleanPhoneDigits = phone.replace(/\D/g, '');
-        const fullPhoneNumber = `+91${cleanPhoneDigits}`;
         setIsSubmitting(true);
 
-        if (supabase) {
-            try {
-                const { data, error } = await supabase.auth.verifyOtp({
-                    phone: fullPhoneNumber,
-                    token,
-                    type: 'sms'
-                });
-
-                if (error) {
-                    if (error.message.includes('expired')) {
-                        setErrorMsg('OTP expired. Please request a new one.');
-                    } else if (error.message.includes('invalid') || error.message.includes('incorrect')) {
-                        setErrorMsg('Invalid OTP. Please try again.');
-                    } else {
-                        setErrorMsg(error.message);
-                    }
-                } else {
-                    // Store vendor session locally
-                    await login(fullPhoneNumber);
-                    navigate('/dashboard');
-                }
-            } catch (err: any) {
-                setErrorMsg(err?.message || 'Verification failed.');
-            } finally {
-                setIsSubmitting(false);
-            }
-        } else {
-            // Mock verification success
-            await login(fullPhoneNumber);
+        try {
+            await verifyOtp(email, token);
             navigate('/dashboard');
+        } catch (err: any) {
+            console.error('OTP Verify Error:', err);
+            const message = err?.message || err?.error_description || (typeof err === 'string' ? err : JSON.stringify(err));
+            setErrorMsg(message === '{}' ? 'Verification failed. Please try again.' : message);
+        } finally {
             setIsSubmitting(false);
         }
     };
@@ -150,7 +124,7 @@ export default function Login() {
         setOtp(newOtp);
 
         // Auto-advance
-        if (val && index < 5) {
+        if (val && index < 7) {
             otpRefs.current[index + 1]?.focus();
         }
     };
@@ -161,14 +135,21 @@ export default function Login() {
         }
     };
 
-    const handleQuickLogin = async (targetPhone: string) => {
-        setPhone(targetPhone.replace(/\D/g, '').substring(targetPhone.replace(/\D/g, '').length - 10));
+    const handleQuickLogin = async (targetEmail: string) => {
+        setEmail(targetEmail);
         setIsSubmitting(true);
+        setErrorMsg('');
+        setInfoMsg('');
+        
         try {
-            await login(targetPhone);
-            navigate('/dashboard');
-        } catch (err) {
-            console.error('Quick login error:', err);
+            // In a real environment, we would still need OTP.
+            // But for demo ease, we can call a mock login or trigger OTP.
+            // Let's trigger OTP so the flow is consistent.
+            await loginWithEmail(targetEmail);
+            setStep('verify');
+            setInfoMsg(`[Demo Mode] OTP sent to ${targetEmail}`);
+        } catch (err: any) {
+            setErrorMsg(err?.message || 'Demo login failed');
         } finally {
             setIsSubmitting(false);
         }
@@ -192,10 +173,10 @@ export default function Login() {
                             <img src="/favicon.png" alt="Streetvend Logo" className="w-12 h-12 relative z-10" />
                         </div>
                         <h1 className="text-3xl sm:text-4xl font-display font-bold text-text-primary text-center mb-3">
-                            {step === 'request' ? t('nav.vendorLogin') : 'Verify Phone'}
+                            {step === 'request' ? t('nav.vendorLogin') : 'Verify Email'}
                         </h1>
                         <p className="text-text-tertiary text-center font-bold uppercase tracking-widest text-[10px]">
-                            {step === 'request' ? 'Streetvend Intelligence Access' : 'Enter 6-Digit OTP'}
+                            {step === 'request' ? 'Streetvend Intelligence Access' : 'Enter 8-Digit OTP'}
                         </p>
                     </div>
 
@@ -214,21 +195,18 @@ export default function Login() {
                     {step === 'request' ? (
                         <form onSubmit={handleSendOtp} className="space-y-6 mb-10">
                             <div>
-                                <label htmlFor="phone" className="block text-[10px] font-bold text-text-tertiary mb-3 uppercase tracking-widest">
-                                    Indian Mobile Number
+                                <label htmlFor="email" className="block text-[10px] font-bold text-text-tertiary mb-3 uppercase tracking-widest">
+                                    Email Address
                                 </label>
                                 <div className="relative group flex items-center">
-                                    <div className="absolute left-5 text-text-primary font-bold text-lg select-none">
-                                        +91
-                                    </div>
                                     <input
-                                        id="phone"
-                                        type="tel"
+                                        id="email"
+                                        type="email"
                                         required
-                                        value={phone}
-                                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').substring(0, 10))}
-                                        className="block w-full pl-16 pr-5 py-4 rounded-xl border border-border-subtle bg-bg-base text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all font-bold text-lg"
-                                        placeholder="Enter 10 digits"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="block w-full px-5 py-4 rounded-xl border border-border-subtle bg-bg-base text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all font-bold text-lg"
+                                        placeholder="vendor@example.com"
                                     />
                                 </div>
                             </div>
@@ -247,7 +225,7 @@ export default function Login() {
                                 <label className="block text-[10px] font-bold text-text-tertiary mb-4 uppercase tracking-widest text-center">
                                     Verification Code
                                 </label>
-                                <div className="flex justify-between gap-2">
+                                <div className="grid grid-cols-8 gap-1 sm:gap-2">
                                     {otp.map((digit, i) => (
                                         <input
                                             key={i}
@@ -257,7 +235,7 @@ export default function Login() {
                                             ref={(el) => { otpRefs.current[i] = el; }}
                                             onChange={(e) => handleOtpChange(i, e.target.value)}
                                             onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                                            className="w-12 h-14 text-center rounded-xl border border-border-subtle bg-bg-base text-text-primary font-bold text-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all"
+                                            className="w-full h-12 sm:h-14 text-center rounded-xl border border-border-subtle bg-bg-base text-text-primary font-bold text-lg sm:text-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all"
                                         />
                                     ))}
                                 </div>
@@ -268,7 +246,7 @@ export default function Login() {
                                 disabled={isSubmitting}
                                 className="w-full flex items-center justify-center gap-3 py-4 px-6 border border-transparent rounded-xl shadow-xl text-sm font-bold text-white primary-button-gradient hover:scale-[1.02] active:scale-[0.95] disabled:opacity-50 transition-all uppercase tracking-widest"
                             >
-                                {isSubmitting ? 'Verifying...' : 'Verify OTP'}
+                                {isSubmitting ? 'Verifying...' : 'Verify & Login'}
                                 <Sparkles className="w-5 h-5" />
                             </button>
 
@@ -293,7 +271,7 @@ export default function Login() {
                                 onClick={() => { setStep('request'); setErrorMsg(''); setInfoMsg(''); }}
                                 className="w-full text-center text-xs text-text-tertiary font-bold uppercase hover:text-text-primary transition-colors"
                             >
-                                ← Change Phone Number
+                                ← Change Email Address
                             </button>
                         </form>
                     )}
@@ -305,11 +283,11 @@ export default function Login() {
                                 <button
                                     key={i}
                                     type="button"
-                                    onClick={() => handleQuickLogin(account.phone)}
+                                    onClick={() => handleQuickLogin(account.email)}
                                     className="w-full text-left flex justify-between items-center px-4 py-3 rounded-xl hover:bg-brand-500/5 transition-all border border-transparent hover:border-brand-500/20 group"
                                 >
                                     <span className="text-xs font-bold text-text-secondary group-hover:text-text-primary transition-colors">{account.name}</span>
-                                    <span className="text-[10px] text-text-tertiary font-bold group-hover:text-brand-500">{account.phone}</span>
+                                    <span className="text-[10px] text-text-tertiary font-bold group-hover:text-brand-500">{account.email}</span>
                                 </button>
                             ))}
                         </div>

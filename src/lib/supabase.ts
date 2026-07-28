@@ -34,7 +34,8 @@ export function mapProductFromDb(row: any): Product {
     price: row.price || 0,
     unit: row.unit || 'piece',
     stock: row.stock_qty ?? 10,
-    category: row.category || 'General'
+    category: row.category || 'General',
+    barcode: row.barcode || ''
   };
 }
 
@@ -50,7 +51,12 @@ export function mapOrderFromDb(row: any): Order {
 }
 
 // Mock database fallback for offline/testing
-export const mockDb = {
+export const mockDb: {
+  vendors: Vendor[];
+  products: Product[];
+  orders: Order[];
+  payments: any[];
+} = {
   vendors: [
     { id: '1', storeName: "Raju's Chaat Corner", ownerName: "Raju Sharma", phone: "+919876543210", category: "Street Food", plan: "professional", subPaid: 599, isActive: true, qrCodeUrl: null, language: "en", createdAt: new Date().toISOString() },
     { id: '2', storeName: "Fresh Green Organics", ownerName: "Meena Patel", phone: "+919876543211", category: "Vegetables & Fruits", plan: "starter", subPaid: 299, isActive: true, qrCodeUrl: null, language: "en", createdAt: new Date().toISOString() },
@@ -88,23 +94,23 @@ export const mockDb = {
     { id: '702', vendorId: '7', name: 'Galouti Kebab', price: 320, unit: 'plate', stock: 20, category: 'Special' }
   ],
   orders: [
-    { id: 'o1', vendorId: '1', items: [{ id: '101', name: 'Pani Puri', price: 40, quantity: 3 }], total: 120, paymentMethod: 'upi', createdAt: new Date(Date.now() - 3600000).toISOString() },
-    { id: 'o2', vendorId: '1', items: [{ id: '102', name: 'Bhel Puri', price: 50, quantity: 2 }, { id: '103', name: 'Aloo Tikki', price: 60, quantity: 1 }], total: 160, paymentMethod: 'cash', createdAt: new Date(Date.now() - 7200000).toISOString() },
-    { id: 'o3', vendorId: '1', items: [{ id: '104', name: 'Dahi Puri', price: 65, quantity: 2 }, { id: '101', name: 'Pani Puri', price: 40, quantity: 1.43 }], total: 187.25, paymentMethod: 'upi', createdAt: new Date(Date.now() - 10800000).toISOString() },
+    { id: 'o1', vendorId: '1', items: [{ productId: '101', name: 'Pani Puri', price: 40, quantity: 3 }], total: 120, paymentMethod: 'upi', createdAt: new Date(Date.now() - 3600000).toISOString() },
+    { id: 'o2', vendorId: '1', items: [{ productId: '102', name: 'Bhel Puri', price: 50, quantity: 2 }, { productId: '103', name: 'Aloo Tikki', price: 60, quantity: 1 }], total: 160, paymentMethod: 'cash', createdAt: new Date(Date.now() - 7200000).toISOString() },
+    { id: 'o3', vendorId: '1', items: [{ productId: '104', name: 'Dahi Puri', price: 65, quantity: 2 }, { productId: '101', name: 'Pani Puri', price: 40, quantity: 1.43 }], total: 187.25, paymentMethod: 'upi', createdAt: new Date(Date.now() - 10800000).toISOString() },
 
-    { id: 'o4', vendorId: '2', items: [{ id: '202', name: 'Farm Fresh Apples', price: 120, quantity: 2 }, { id: '201', name: 'Organic Spinach', price: 33, quantity: 1 }], total: 273, paymentMethod: 'upi', createdAt: new Date().toISOString() },
+    { id: 'o4', vendorId: '2', items: [{ productId: '202', name: 'Farm Fresh Apples', price: 120, quantity: 2 }, { productId: '201', name: 'Organic Spinach', price: 33, quantity: 1 }], total: 273, paymentMethod: 'upi', createdAt: new Date().toISOString() },
 
-    { id: 'o5', vendorId: '3', items: [{ id: '301', name: 'Fresh Chicken Breast', price: 260, quantity: 1 }, { id: '302', name: 'Mutton Chops', price: 202, quantity: 1 }], total: 462, paymentMethod: 'cash', createdAt: new Date().toISOString() },
+    { id: 'o5', vendorId: '3', items: [{ productId: '301', name: 'Fresh Chicken Breast', price: 260, quantity: 1 }, { productId: '302', name: 'Mutton Chops', price: 202, quantity: 1 }], total: 462, paymentMethod: 'cash', createdAt: new Date().toISOString() },
 
-    { id: 'o6', vendorId: '4', items: [{ id: '401', name: 'Masala Dosa', price: 70, quantity: 2 }, { id: '403', name: 'Idli Vada Combo', price: 60, quantity: 1.51 }], total: 231, paymentMethod: 'upi', createdAt: new Date().toISOString() },
+    { id: 'o6', vendorId: '4', items: [{ productId: '401', name: 'Masala Dosa', price: 70, quantity: 2 }, { productId: '403', name: 'Idli Vada Combo', price: 60, quantity: 1.51 }], total: 231, paymentMethod: 'upi', createdAt: new Date().toISOString() },
 
-    { id: 'o7', vendorId: '5', items: [{ id: '503', name: 'Mutton Seekh Kabab', price: 350, quantity: 5 }, { id: '501', name: 'Chicken Tikka Kabab', price: 240, quantity: 5 }], total: 2950, paymentMethod: 'upi', createdAt: new Date().toISOString() },
-    { id: 'o8', vendorId: '5', items: [{ id: '502', name: 'Reshmi Kabab', price: 280, quantity: 3.15 }], total: 882.5, paymentMethod: 'cash', createdAt: new Date().toISOString() },
+    { id: 'o7', vendorId: '5', items: [{ productId: '503', name: 'Mutton Seekh Kabab', price: 350, quantity: 5 }, { productId: '501', name: 'Chicken Tikka Kabab', price: 240, quantity: 5 }], total: 2950, paymentMethod: 'upi', createdAt: new Date().toISOString() },
+    { id: 'o8', vendorId: '5', items: [{ productId: '502', name: 'Reshmi Kabab', price: 280, quantity: 3.15 }], total: 882.5, paymentMethod: 'cash', createdAt: new Date().toISOString() },
 
-    { id: 'o9', vendorId: '6', items: [{ id: '601', name: 'Basmati Rice 1kg', price: 110, quantity: 1 }, { id: '602', name: 'Fortune Sunflower Oil 1L', price: 145, quantity: 1 }, { id: '601', name: 'Extra Item', price: 46.35, quantity: 1 }], total: 301.35, paymentMethod: 'cash', createdAt: new Date().toISOString() },
+    { id: 'o9', vendorId: '6', items: [{ productId: '601', name: 'Basmati Rice 1kg', price: 110, quantity: 1 }, { productId: '602', name: 'Fortune Sunflower Oil 1L', price: 145, quantity: 1 }, { productId: '601', name: 'Extra Item', price: 46.35, quantity: 1 }], total: 301.35, paymentMethod: 'cash', createdAt: new Date().toISOString() },
 
-    { id: 'o10', vendorId: '7', items: [{ id: '701', name: 'Special Mixed Platter', price: 580, quantity: 1 }, { id: '702', name: 'Galouti Kebab', price: 320, quantity: 1 }], total: 900, paymentMethod: 'upi', createdAt: new Date().toISOString() },
-    { id: 'o11', vendorId: '7', items: [{ id: '702', name: 'Galouti Kebab', price: 297, quantity: 1 }], total: 297, paymentMethod: 'upi', createdAt: new Date().toISOString() }
+    { id: 'o10', vendorId: '7', items: [{ productId: '701', name: 'Special Mixed Platter', price: 580, quantity: 1 }, { productId: '702', name: 'Galouti Kebab', price: 320, quantity: 1 }], total: 900, paymentMethod: 'upi', createdAt: new Date().toISOString() },
+    { id: 'o11', vendorId: '7', items: [{ productId: '702', name: 'Galouti Kebab', price: 297, quantity: 1 }], total: 297, paymentMethod: 'upi', createdAt: new Date().toISOString() }
   ],
   payments: []
 };

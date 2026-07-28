@@ -1,13 +1,10 @@
-const CACHE_NAME = 'streetvend-v1';
+const CACHE_NAME = 'streetvend-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/icon-192.png',
-  '/icon-512.png',
-  '/apple-touch-icon.png',
-  '/pwa-maskable.png',
-  '/favicon.png'
+  '/icon-512.jpg',
+  '/pwa-maskable.jpg'
 ];
 
 self.addEventListener('install', (event) => {
