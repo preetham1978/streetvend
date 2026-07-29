@@ -20,7 +20,7 @@ export default function Login() {
     const navigate = useNavigate();
 
     const [email, setEmail] = useState('');
-    const [otp, setOtp] = useState(['', '', '', '', '', '', '', '']);
+    const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [step, setStep] = useState<'request' | 'verify'>('request');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [countdown, setCountdown] = useState(0);
@@ -98,8 +98,8 @@ export default function Login() {
         setInfoMsg('');
 
         const token = otp.join('');
-        if (token.length !== 8) {
-            setErrorMsg('Please enter all 8 digits of the OTP');
+        if (token.length !== 6) {
+            setErrorMsg('Please enter all 6 digits of the OTP');
             return;
         }
 
@@ -124,7 +124,7 @@ export default function Login() {
         setOtp(newOtp);
 
         // Auto-advance
-        if (val && index < 7) {
+        if (val && index < 5) {
             otpRefs.current[index + 1]?.focus();
         }
     };
@@ -176,7 +176,7 @@ export default function Login() {
                             {step === 'request' ? t('nav.vendorLogin') : 'Verify Email'}
                         </h1>
                         <p className="text-text-tertiary text-center font-bold uppercase tracking-widest text-[10px]">
-                            {step === 'request' ? 'Streetvend Intelligence Access' : 'Enter 8-Digit OTP'}
+                            {step === 'request' ? 'Streetvend Intelligence Access' : 'Enter 6-Digit OTP'}
                         </p>
                     </div>
 
@@ -225,7 +225,7 @@ export default function Login() {
                                 <label className="block text-[10px] font-bold text-text-tertiary mb-4 uppercase tracking-widest text-center">
                                     Verification Code
                                 </label>
-                                <div className="grid grid-cols-8 gap-1 sm:gap-2">
+                                <div className="grid grid-cols-6 gap-2">
                                     {otp.map((digit, i) => (
                                         <input
                                             key={i}
@@ -235,7 +235,7 @@ export default function Login() {
                                             ref={(el) => { otpRefs.current[i] = el; }}
                                             onChange={(e) => handleOtpChange(i, e.target.value)}
                                             onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                                            className="w-full h-12 sm:h-14 text-center rounded-xl border border-border-subtle bg-bg-base text-text-primary font-bold text-lg sm:text-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all"
+                                            className="w-full h-14 text-center rounded-xl border border-border-subtle bg-bg-base text-text-primary font-bold text-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all"
                                         />
                                     ))}
                                 </div>

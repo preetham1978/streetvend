@@ -12,7 +12,7 @@ export default function Register() {
     const { t } = useI18n();
     const [step, setStep] = useState(1);
     const [isVerifying, setIsVerifying] = useState(false);
-    const [otp, setOtp] = useState(['', '', '', '', '', '', '', '']);
+    const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
     const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -62,8 +62,8 @@ export default function Register() {
         e.preventDefault();
         setErrorMsg('');
         const token = otp.join('');
-        if (token.length !== 8) {
-            setErrorMsg('Enter 8-digit verification code');
+        if (token.length !== 6) {
+            setErrorMsg('Enter 6-digit verification code');
             return;
         }
 
@@ -113,7 +113,7 @@ export default function Register() {
         const newOtp = [...otp];
         newOtp[index] = val.substring(val.length - 1);
         setOtp(newOtp);
-        if (val && index < 7) otpRefs.current[index + 1]?.focus();
+        if (val && index < 5) otpRefs.current[index + 1]?.focus();
     };
 
     const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -147,7 +147,7 @@ export default function Register() {
                     )}
 
                     <form onSubmit={handleVerifyAndComplete} className="space-y-8">
-                        <div className="grid grid-cols-8 gap-1 sm:gap-2">
+                        <div className="grid grid-cols-6 gap-2">
                             {otp.map((digit, i) => (
                                 <input
                                     key={i}
@@ -157,7 +157,7 @@ export default function Register() {
                                     ref={(el) => { otpRefs.current[i] = el; }}
                                     onChange={(e) => handleOtpChange(i, e.target.value)}
                                     onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                                    className="w-full h-12 sm:h-14 text-center rounded-xl border border-border-subtle bg-bg-base text-text-primary font-bold text-lg sm:text-xl focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all"
+                                    className="w-full h-14 text-center rounded-xl border border-border-subtle bg-bg-base text-text-primary font-bold text-xl focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all"
                                 />
                             ))}
                         </div>

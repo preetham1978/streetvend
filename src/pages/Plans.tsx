@@ -35,38 +35,47 @@ export default function Plans() {
         if (!checkoutPlan || !user) return;
         setIsProcessing(true);
 
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        try {
+            const amount = checkoutPlan.amount;
+            
+            // 1. Call server to initiate PayU payment
+            const response = await fetch('/api/payu/initiate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    planId: checkoutPlan.plan.id,
+                    vendorId: user.id,
+                    vendorEmail: user.email,
+                    vendorName: user.name || user.email.split('@')[0],
+                    amount: amount,
+                    productInfo: `${checkoutPlan.plan.name} (${checkoutPlan.cycle})`
+                })
+            });
 
-        const amount = checkoutPlan.amount;
-        const gst = amount * 0.18;
-        const total = amount + gst;
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
 
-        updatePlan(checkoutPlan.plan.id);
+            // 2. Redirect to PayU by programmatically submitting a form
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = data.payuUrl;
 
-        if (supabase) {
-            try {
-                await (supabase.from('subscription_payments') as any).insert([{
-                    id: 'pay_' + Math.random().toString(36).substring(2, 9),
-                    vendor_id: user.id,
-                    tier: checkoutPlan.plan.id,
-                    plan_name: `${checkoutPlan.plan.name} (${checkoutPlan.cycle})`,
-                    amount: total,
-                    currency: 'INR',
-                    method: checkoutMethod,
-                    status: 'success',
-                    created_at: new Date().toISOString()
-                }]);
-            } catch (err) {
-                console.error("Supabase payment record error:", err);
-            }
+            Object.entries(data.params).forEach(([key, value]) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = key;
+                input.value = value as string;
+                form.appendChild(input);
+            });
+
+            document.body.appendChild(form);
+            form.submit();
+            
+        } catch (err: any) {
+            console.error("Payment initiation error:", err);
+            alert("Payment failed to start: " + (err.message || "Unknown error"));
+            setIsProcessing(false);
         }
-
-        setIsProcessing(false);
-        setIsSuccess(true);
-        setTimeout(() => {
-            setCheckoutPlan(null);
-            setIsSuccess(false);
-        }, 2000);
     };
 
     const getPlanIcon = (iconName: string) => {

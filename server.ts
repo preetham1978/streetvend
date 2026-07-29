@@ -4,6 +4,7 @@ import { createServer as createViteServer } from "vite";
 import fs from "fs";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import crypto from "crypto";
 
 dotenv.config();
 
@@ -14,6 +15,118 @@ async function startServer() {
   console.log("GEMINI_API_KEY available:", !!process.env.GEMINI_API_KEY); // Diagnostic step 5
 
   app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+
+  // PayU Initiate Payment
+  app.post("/api/payu/initiate", async (req, res) => {
+    try {
+      const { planId, vendorId, vendorEmail, vendorName, amount, productInfo } = req.body;
+      
+      const key = process.env.PAYU_MERCHANT_KEY;
+      const salt = process.env.PAYU_MERCHANT_SALT;
+      const mode = process.env.PAYU_MODE || "test";
+      const baseUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+
+      if (!key || !salt) {
+        console.error("PayU Error: PAYU_MERCHANT_KEY or PAYU_MERCHANT_SALT not configured");
+        return res.status(500).json({ error: "PayU credentials not configured" });
+      }
+
+      // 1. Generate unique txnid
+      const txnid = `SV_${Date.now()}_${vendorId.substring(0, 8)}`;
+      
+      // 2. Calculate Final Amount with 18% GST (Server-side calculation)
+      const baseAmount = parseFloat(amount);
+      const finalAmount = (baseAmount * 1.18).toFixed(2);
+
+      // 3. Set URLs - Using separate success and failure endpoints as requested
+      const surl = `${baseUrl}/api/payu/success`;
+      const furl = `${baseUrl}/api/payu/failure`;
+
+      // 4. Generate Hash
+      // Formula: key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5|udf6|udf7|udf8|udf9|udf10|salt
+      const udf1 = planId;
+      const udf2 = vendorId;
+      
+      // Clean data to prevent hash issues
+      const cleanName = vendorName.replace(/[^a-zA-Z0-9 ]/g, '').trim() || 'Vendor';
+      const cleanProductInfo = productInfo.substring(0, 100);
+
+      const hashString = `${key}|${txnid}|${finalAmount}|${cleanProductInfo}|${cleanName}|${vendorEmail}|${udf1}|${udf2}|||||||||${salt}`;
+      const hash = crypto.createHash('sha512').update(hashString).digest('hex');
+
+      const payuUrl = mode === 'production' 
+        ? "https://secure.payu.in/_payment" 
+        : "https://test.payu.in/_payment";
+
+      console.log(`PayU Initiate: txnid=${txnid}, amount=${finalAmount}, surl=${surl}`);
+
+      res.json({
+        payuUrl,
+        params: {
+          key,
+          txnid,
+          amount: finalAmount,
+          productinfo: cleanProductInfo,
+          firstname: cleanName,
+          email: vendorEmail,
+          phone: "9999999999", // Mandatory field for PayU
+          surl,
+          furl,
+          hash,
+          udf1,
+          udf2,
+          service_provider: "payu_paisa"
+        }
+      });
+    } catch (error: any) {
+      console.error("PayU Initiate Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PayU Success Handler
+  app.post("/api/payu/success", async (req, res) => {
+    try {
+      const payuResponse = req.body;
+      const salt = process.env.PAYU_MERCHANT_SALT;
+      if (!salt) throw new Error("PayU Salt missing in environment");
+
+      const {
+        status, txnid, amount, productinfo, firstname, email, 
+        udf1: planId, udf2: vendorId, key, hash: receivedHash
+      } = payuResponse;
+
+      // Verify Hash
+      // Formula: salt|status|udf10|udf9|udf8|udf7|udf6|udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key
+      // udf2 is vendorId, udf1 is planId. There are 8 empty fields before udf2.
+      const reverseHashString = `${salt}|${status}|||||||||${vendorId}|${planId}|${email}|${firstname}|${productinfo}|${amount}|${txnid}|${key}`;
+      const calculatedHash = crypto.createHash('sha512').update(reverseHashString).digest('hex');
+
+      if (calculatedHash !== receivedHash) {
+        console.error("PayU Hash Mismatch! Possible fraud attempt.", { txnid, receivedHash, calculatedHash });
+        return res.redirect(`/dashboard?payment=failed&reason=hash_mismatch`);
+      }
+
+      console.log(`PayU Payment Success: txnid=${txnid}, plan=${planId}`);
+      return res.redirect(`/dashboard?payment=success&txnid=${txnid}&planId=${planId}&amount=${amount}`);
+    } catch (error: any) {
+      console.error("PayU Success Handler Error:", error);
+      res.redirect(`/dashboard?payment=error&message=${encodeURIComponent(error.message)}`);
+    }
+  });
+
+  // PayU Failure Handler
+  app.post("/api/payu/failure", async (req, res) => {
+    try {
+      const { txnid, status, error_Message, field9_with_cd } = req.body;
+      console.log(`PayU Payment Failed: txnid=${txnid}, status=${status}, reason=${error_Message || field9_with_cd}`);
+      return res.redirect(`/dashboard?payment=failed&txnid=${txnid}&reason=${encodeURIComponent(error_Message || 'payment_failed')}`);
+    } catch (error) {
+      console.error("PayU Failure Handler Error:", error);
+      res.redirect(`/dashboard?payment=failed`);
+    }
+  });
 
   // Explicit PWA asset route handlers for Chrome/iOS PWA installability
   app.get(["/manifest.json", "/manifest.webmanifest"], (req, res) => {
@@ -55,7 +168,7 @@ async function startServer() {
       If no match is found, return { "error": "Not recognized" }.`;
 
       const response = await withRetry(() => ai.models.generateContent({
-        model: "gemini-1.5-flash", 
+        model: "gemini-3.6-flash", 
         contents: [
           {
             role: "user",
@@ -146,7 +259,7 @@ async function startServer() {
           });
           
           const response = await withRetry(() => ai.models.generateContent({
-            model: "gemini-1.5-flash",
+            model: "gemini-3.6-flash",
             contents: prompt,
             config: {
               systemInstruction: `You are Streetvend AI, an intelligent business assistant for street vendors. Respond in ${language || 'en'}. Keep it concise, practical, and highly actionable.`,
@@ -211,7 +324,7 @@ Return ONLY valid JSON in this format:
 }`;
 
             const result = await withRetry(() => ai.models.generateContent({
-              model: "gemini-1.5-flash",
+              model: "gemini-3.6-flash",
               contents: [
                 {
                   inlineData: {
@@ -234,7 +347,7 @@ Match to this catalog: ${JSON.stringify(products || [])}.
 Return ONLY a JSON array of objects with 'productId', 'name', and 'quantity'.`;
 
             const result = await withRetry(() => ai.models.generateContent({
-              model: "gemini-1.5-flash",
+              model: "gemini-3.6-flash",
               contents: prompt
             }));
             const rawText = result.text.replace(/```json/g, "").replace(/```/g, "").trim();
@@ -290,7 +403,7 @@ Return ONLY a JSON array of objects with 'productId', 'name', and 'quantity'.`;
                 }
 
                 const response = await withRetry(() => ai.models.generateContent({
-                    model: "gemini-1.5-flash",
+                    model: "gemini-3.6-flash",
                     contents: prompt,
                     config: {
                         responseMimeType: "application/json",
@@ -367,7 +480,7 @@ Format as JSON:
 }`;
                 
                 const response = await withRetry(() => ai.models.generateContent({
-                    model: "gemini-1.5-flash",
+                    model: "gemini-3.6-flash",
                     contents: prompt,
                     config: {
                         responseMimeType: "application/json",

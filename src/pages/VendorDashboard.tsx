@@ -65,7 +65,7 @@ const MOCK_DASHBOARD_STATS = {
 
 export default function VendorDashboard() {
     const { t } = useI18n();
-    const { user, isLoading } = useAuth();
+    const { user, isLoading, updatePlan } = useAuth();
     console.log("VendorDashboard user object:", user);
     const navigate = useNavigate();
     const [products, setProducts] = useState<Product[]>([]);
@@ -79,17 +79,29 @@ export default function VendorDashboard() {
     const [chatHistory, setChatHistory] = useState<{role: 'user'|'ai', text: string}[]>([]);
     const [notes, setNotes] = useState<{text: string, date: string}[]>([]);
 
-    useEffect(() => {
-        if (user && !localStorage.getItem('has_seen_dashboard_tour')) {
-            const timer = setTimeout(() => {
-                setIsTourOpen(true);
-            }, 1000);
-            return () => clearTimeout(timer);
-        }
-    }, [user]);
-
     const [isAnalyzingNotes, setIsAnalyzingNotes] = useState(false);
     const [noteSummary, setNoteSummary] = useState<{restock?: string[], prep?: string[], insights?: string[]} | null>(null);
+
+    // Handle PayU Payment Redirection
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const paymentStatus = params.get('payment');
+        const planId = params.get('planId') as any;
+        const txnid = params.get('txnid');
+
+        if (paymentStatus === 'success' && planId && user) {
+            // Only update if the plan is different
+            if (user.plan !== planId) {
+                updatePlan(planId);
+                alert(`Success! Your plan has been upgraded to ${planId}. Transaction ID: ${txnid}`);
+                // Clear the URL params
+                window.history.replaceState({}, document.title, "/dashboard");
+            }
+        } else if (paymentStatus === 'failed') {
+            alert(`Payment Failed. Please try again or contact support if amount was deducted. Transaction ID: ${txnid}`);
+            window.history.replaceState({}, document.title, "/dashboard");
+        }
+    }, [user, updatePlan]);
 
     const handleAnalyzeNotes = async () => {
         if (notes.length === 0) return;
