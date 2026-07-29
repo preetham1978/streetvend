@@ -5,8 +5,25 @@ import fs from "fs";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import crypto from "crypto";
+import { createClient } from "@supabase/supabase-js";
+import axios from "axios";
 
 dotenv.config();
+
+// Initialize Supabase client lazily to prevent startup crashes
+let supabaseAdminInstance: any = null;
+const getSupabaseAdmin = () => {
+  if (!supabaseAdminInstance) {
+    const url = process.env.VITE_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) {
+      console.warn("Supabase Admin credentials missing. Database updates will be skipped.");
+      return null;
+    }
+    supabaseAdminInstance = createClient(url, key);
+  }
+  return supabaseAdminInstance;
+};
 
 async function startServer() {
   const app = express();
@@ -17,6 +34,17 @@ async function startServer() {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
+  // PayU Test Route
+  app.get("/api/payu/test", (req, res) => {
+    res.json({ 
+      status: "callback route reachable", 
+      timestamp: new Date(),
+      env_app_url: process.env.APP_URL,
+      detected_host: req.get('host'),
+      protocol: req.get('x-forwarded-proto') || req.protocol
+    });
+  });
+
   // PayU Initiate Payment
   app.post("/api/payu/initiate", async (req, res) => {
     try {
@@ -25,7 +53,15 @@ async function startServer() {
       const key = process.env.PAYU_MERCHANT_KEY;
       const salt = process.env.PAYU_MERCHANT_SALT;
       const mode = process.env.PAYU_MODE || "test";
-      const baseUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+      
+      // Explicitly prefer APP_URL from environment
+      let baseUrl = process.env.APP_URL;
+      const protocol = req.get('x-forwarded-proto') || req.protocol;
+      
+      if (!baseUrl) {
+        baseUrl = `${protocol}://${req.get('host')}`;
+        console.warn(`APP_URL not set. Falling back to detected URL: ${baseUrl}`);
+      }
 
       if (!key || !salt) {
         console.error("PayU Error: PAYU_MERCHANT_KEY or PAYU_MERCHANT_SALT not configured");
@@ -43,16 +79,57 @@ async function startServer() {
       const surl = `${baseUrl}/api/payu/success`;
       const furl = `${baseUrl}/api/payu/failure`;
 
+      console.log('--- PAYU INITIATION ---');
+      console.log('PAYU SURL:', surl);
+      console.log('PAYU FURL:', furl);
+      console.log('BASE URL:', baseUrl);
+      console.log('PROTOCOL DETECTED:', protocol);
+      console.log('PLAN ID:', planId);
+      console.log('VENDOR ID:', vendorId);
+      console.log('-----------------------');
+
       // 4. Generate Hash
       // Formula: key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5|udf6|udf7|udf8|udf9|udf10|salt
       const udf1 = planId;
       const udf2 = vendorId;
+      const udf3 = "";
+      const udf4 = "";
+      const udf5 = "";
+      const udf6 = "";
+      const udf7 = "";
+      const udf8 = "";
+      const udf9 = "";
+      const udf10 = "";
       
       // Clean data to prevent hash issues
       const cleanName = vendorName.replace(/[^a-zA-Z0-9 ]/g, '').trim() || 'Vendor';
       const cleanProductInfo = productInfo.substring(0, 100);
 
-      const hashString = `${key}|${txnid}|${finalAmount}|${cleanProductInfo}|${cleanName}|${vendorEmail}|${udf1}|${udf2}|||||||||${salt}`;
+      const hashParts = [
+        key,
+        txnid,
+        finalAmount,
+        cleanProductInfo,
+        cleanName,
+        vendorEmail,
+        udf1,
+        udf2,
+        udf3,
+        udf4,
+        udf5,
+        udf6,
+        udf7,
+        udf8,
+        udf9,
+        udf10,
+        salt
+      ];
+
+      const hashString = hashParts.join('|');
+      
+      console.log(`PayU Debug - Key starts with: ${key?.substring(0, 3)}, Salt defined: ${!!salt}`);
+      console.log(`PayU Hash String: ${hashString}`);
+      
       const hash = crypto.createHash('sha512').update(hashString).digest('hex');
 
       const payuUrl = mode === 'production' 
@@ -87,8 +164,10 @@ async function startServer() {
 
   // PayU Success Handler
   app.post("/api/payu/success", async (req, res) => {
+    console.log("CRITICAL: PayU Success Callback REACHED Server!");
     try {
       const payuResponse = req.body;
+      console.log("PayU Success Callback Body:", JSON.stringify(payuResponse, null, 2));
       const salt = process.env.PAYU_MERCHANT_SALT;
       if (!salt) throw new Error("PayU Salt missing in environment");
 
@@ -99,8 +178,28 @@ async function startServer() {
 
       // Verify Hash
       // Formula: salt|status|udf10|udf9|udf8|udf7|udf6|udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key
-      // udf2 is vendorId, udf1 is planId. There are 8 empty fields before udf2.
-      const reverseHashString = `${salt}|${status}|||||||||${vendorId}|${planId}|${email}|${firstname}|${productinfo}|${amount}|${txnid}|${key}`;
+      const hashParts = [
+        salt,
+        status,
+        payuResponse.udf10 || "",
+        payuResponse.udf9 || "",
+        payuResponse.udf8 || "",
+        payuResponse.udf7 || "",
+        payuResponse.udf6 || "",
+        payuResponse.udf5 || "",
+        payuResponse.udf4 || "",
+        payuResponse.udf3 || "",
+        vendorId,
+        planId,
+        email,
+        firstname,
+        productinfo,
+        amount,
+        txnid,
+        key
+      ];
+      
+      const reverseHashString = hashParts.join('|');
       const calculatedHash = crypto.createHash('sha512').update(reverseHashString).digest('hex');
 
       if (calculatedHash !== receivedHash) {
@@ -109,6 +208,50 @@ async function startServer() {
       }
 
       console.log(`PayU Payment Success: txnid=${txnid}, plan=${planId}`);
+
+      // Update Database
+      try {
+        const mihpayid = payuResponse.mihpayid;
+        const supabaseAdmin = getSupabaseAdmin();
+        
+        if (supabaseAdmin) {
+          // 1. Update Vendor Plan
+          const { error: vendorError } = await supabaseAdmin
+            .from('vendors')
+            .update({ 
+              subscription: planId
+            })
+            .eq('id', vendorId);
+
+          if (vendorError) {
+            console.error("Error updating vendor plan:", vendorError);
+          }
+
+          // 2. Insert Payment Record
+          const { error: paymentError } = await supabaseAdmin
+            .from('subscription_payments')
+            .insert([{
+              vendor_id: vendorId,
+              txnid: txnid,
+              gateway_ref: mihpayid,
+              amount: parseFloat(amount),
+              tier: planId,
+              plan_name: planId === 'professional' ? 'Professional' : (planId.charAt(0).toUpperCase() + planId.slice(1)),
+              status: 'success',
+              raw_response: JSON.stringify(payuResponse),
+              created_at: new Date().toISOString()
+            }]);
+
+          if (paymentError) {
+            console.error("Error inserting subscription payment record:", paymentError);
+          } else {
+            console.log(`Successfully recorded payment for vendor ${vendorId}`);
+          }
+        }
+      } catch (dbError) {
+        console.error("Database update error after PayU success:", dbError);
+      }
+
       return res.redirect(`/dashboard?payment=success&txnid=${txnid}&planId=${planId}&amount=${amount}`);
     } catch (error: any) {
       console.error("PayU Success Handler Error:", error);
@@ -149,6 +292,124 @@ async function startServer() {
       res.sendFile(swPath);
     } else {
       res.status(404).send("Service worker not found");
+    }
+  });
+
+  // PayU Verification and Fulfillment (Client-side initiated but server-verified)
+  app.post("/api/payu/verify-and-fulfill", async (req, res) => {
+    try {
+      const { txnid, planId, amount, vendorId } = req.body;
+      
+      if (!txnid || !planId || !vendorId) {
+        return res.status(400).json({ error: "Missing required fulfillment parameters" });
+      }
+
+      console.log(`Verifying and fulfilling transaction: ${txnid} for vendor ${vendorId}`);
+
+      const key = process.env.PAYU_MERCHANT_KEY;
+      const salt = process.env.PAYU_MERCHANT_SALT;
+      const mode = process.env.PAYU_MODE || "test";
+
+      if (!key || !salt) {
+        throw new Error("PayU credentials missing in environment");
+      }
+
+      // 1. Generate Hash for verify_payment
+      // Formula: key|command|var1|salt
+      const command = "verify_payment";
+      const hashString = `${key}|${command}|${txnid}|${salt}`;
+      const hash = crypto.createHash('sha512').update(hashString).digest('hex');
+
+      // 2. Call PayU Verify API
+      const payuVerifyUrl = mode === 'production' 
+        ? "https://info.payu.in/merchant/postservice?form=2" 
+        : "https://test.payu.in/merchant/postservice?form=2";
+
+      const params = new URLSearchParams();
+      params.append('key', key);
+      params.append('command', command);
+      params.append('var1', txnid);
+      params.append('hash', hash);
+
+      const response = await axios.post(payuVerifyUrl, params, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      });
+
+      const data = response.data;
+      console.log(`PayU Verify API Response for ${txnid}:`, JSON.stringify(data));
+
+      if (data.status !== 1 || !data.transaction_details || !data.transaction_details[txnid]) {
+        return res.status(400).json({ error: "Transaction not found in PayU records" });
+      }
+
+      const txDetails = data.transaction_details[txnid];
+      
+      if (txDetails.status !== 'success') {
+        return res.status(400).json({ error: `Transaction status is ${txDetails.status}, not success` });
+      }
+
+      // 3. Idempotency Check & Fulfillment
+      const supabaseAdmin = getSupabaseAdmin();
+      if (!supabaseAdmin) {
+        throw new Error("Database connection unavailable");
+      }
+
+      // Check if already fulfilled
+      const { data: existingPayment } = await supabaseAdmin
+        .from('subscription_payments')
+        .select('id')
+        .eq('txnid', txnid)
+        .single();
+
+      if (existingPayment) {
+        console.log(`Transaction ${txnid} already fulfilled.`);
+        return res.json({ success: true, already_fulfilled: true });
+      }
+
+      // 4. Update Database
+      // 1. Update Vendor Plan
+      const { error: vendorError } = await supabaseAdmin
+        .from('vendors')
+        .update({ 
+          subscription: planId
+        })
+        .eq('id', vendorId);
+
+      if (vendorError) {
+        console.error("Error updating vendor plan:", vendorError);
+        throw vendorError;
+      }
+
+      // 2. Insert Payment Record
+      const { error: paymentError } = await supabaseAdmin
+        .from('subscription_payments')
+        .insert([{
+          id: txnid,
+          vendor_id: vendorId,
+          gateway_ref: txDetails.mihpayid,
+          amount: parseFloat(amount || txDetails.amount),
+          tier: planId,
+          plan_name: planId === 'professional' ? 'Professional' : (planId.charAt(0).toUpperCase() + planId.slice(1)),
+          status: 'success',
+          method: txDetails.mode || 'PayU',
+          payer_detail: JSON.stringify(txDetails),
+          created_at: new Date().toISOString(),
+          paid_at: new Date().toISOString()
+        }]);
+
+      if (paymentError) {
+        console.error("Error inserting subscription payment record:", paymentError);
+        throw paymentError;
+      }
+
+      console.log(`Successfully fulfilled transaction ${txnid} for vendor ${vendorId}`);
+      res.json({ success: true, plan: planId });
+
+    } catch (error: any) {
+      console.error("Verify and Fulfill Error:", error);
+      res.status(500).json({ error: error.message });
     }
   });
 

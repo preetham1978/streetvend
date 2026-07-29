@@ -68,7 +68,7 @@ export default function ChurnRiskTable({ data, onReEngage }: ChurnRiskTableProps
                                     </td>
                                     <td className="py-4 px-4">
                                         <span className="px-2 py-0.5 rounded-full bg-bg-surface border border-border-subtle text-[10px] font-extrabold uppercase tracking-widest text-text-secondary">
-                                            {vendor.plan_tier}
+                                            {vendor.subscription}
                                         </span>
                                     </td>
                                     <td className="py-4 px-4 text-center">

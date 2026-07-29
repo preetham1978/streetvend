@@ -65,7 +65,7 @@ const MOCK_DASHBOARD_STATS = {
 
 export default function VendorDashboard() {
     const { t } = useI18n();
-    const { user, isLoading, updatePlan } = useAuth();
+    const { user, isLoading, updatePlan, refreshProfile } = useAuth();
     console.log("VendorDashboard user object:", user);
     const navigate = useNavigate();
     const [products, setProducts] = useState<Product[]>([]);
@@ -89,19 +89,40 @@ export default function VendorDashboard() {
         const planId = params.get('planId') as any;
         const txnid = params.get('txnid');
 
-        if (paymentStatus === 'success' && planId && user) {
-            // Only update if the plan is different
-            if (user.plan !== planId) {
-                updatePlan(planId);
-                alert(`Success! Your plan has been upgraded to ${planId}. Transaction ID: ${txnid}`);
-                // Clear the URL params
-                window.history.replaceState({}, document.title, "/dashboard");
-            }
+        if (paymentStatus === 'success' && user && txnid) {
+            const amount = params.get('amount');
+            
+            // Secure fulfillment flow: Verify with server which verifies with PayU
+            const fulfillPayment = async () => {
+                try {
+                    const response = await fetch('/api/payu/verify-and-fulfill', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ txnid, planId, amount, vendorId: user.id })
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Fulfillment failed');
+                    }
+                    
+                    // After server confirms fulfillment, refresh local state
+                    await refreshProfile();
+                    alert(`Success! Your account has been upgraded to ${planId === 'professional' ? 'Professional' : planId}. Transaction ID: ${txnid}`);
+                } catch (err: any) {
+                    console.error("Fulfillment error:", err);
+                    alert(`Payment was successful, but we encountered an error updating your account: ${err.message}. Please contact support with Transaction ID: ${txnid}`);
+                } finally {
+                    navigate('/dashboard', { replace: true });
+                }
+            };
+            
+            fulfillPayment();
         } else if (paymentStatus === 'failed') {
             alert(`Payment Failed. Please try again or contact support if amount was deducted. Transaction ID: ${txnid}`);
-            window.history.replaceState({}, document.title, "/dashboard");
+            navigate('/dashboard', { replace: true });
         }
-    }, [user, updatePlan]);
+    }, [user?.id, refreshProfile, navigate, updatePlan]);
 
     const handleAnalyzeNotes = async () => {
         if (notes.length === 0) return;
@@ -228,7 +249,7 @@ export default function VendorDashboard() {
                     <div className="relative z-10">
                         <div className="flex flex-wrap items-center gap-4 mb-4">
                             <h1 className="text-2xl sm:text-3xl md:text-4xl font-display font-extrabold text-text-primary leading-tight truncate max-w-full">{user.storeName}</h1>
-                            <span className="px-3 py-1 rounded-full bg-brand-500/10 text-brand-500 text-[10px] font-bold uppercase tracking-widest border border-brand-500/20">{user.plan}</span>
+                            <span className="px-3 py-1 rounded-full bg-brand-500/10 text-brand-500 text-[10px] font-bold uppercase tracking-widest border border-brand-500/20">{user.subscription}</span>
                             <TourTriggerButton onClick={() => setIsTourOpen(true)} />
                         </div>
                         <p className="text-text-tertiary font-bold uppercase tracking-widest text-xs">{user.ownerName} · {user.category}</p>

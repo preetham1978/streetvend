@@ -288,7 +288,7 @@ export default function ProductsPage() {
                         owner_name: user?.ownerName || 'Vendor',
                         phone: user?.phone || '',
                         category: user?.category || 'Street Food',
-                        subscription: user?.plan === 'professional' ? 'pro' : (user?.plan || 'free'),
+                        subscription: user?.subscription || 'free',
                         is_active: true
                     };
                     await (supabase.from('vendors') as any).upsert([vendorData], { onConflict: 'id' });

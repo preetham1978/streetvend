@@ -166,7 +166,7 @@ export default function AdminAnalytics() {
             ...(leaderboard.map(v => [
                 v.vendor_name,
                 v.store_name,
-                v.plan_tier,
+                v.subscription,
                 v.total_orders_30d,
                 v.total_revenue_30d
             ])),
@@ -175,7 +175,7 @@ export default function AdminAnalytics() {
             ['Vendor Name', 'Plan', 'Days Inactive', 'Last Active'],
             ...(churnRisk.map(v => [
                 v.vendor_name,
-                v.plan_tier,
+                v.subscription,
                 v.days_inactive,
                 v.last_login_at
             ]))

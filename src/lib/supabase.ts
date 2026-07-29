@@ -17,8 +17,7 @@ export function mapVendorFromDb(row: any): Vendor {
     phone: row.phone || '',
     email: row.email || '',
     category: row.category || 'Street Food',
-    plan: (row.subscription === 'pro' ? 'professional' : row.subscription) || 'free',
-    subPaid: row.subscription === 'enterprise' ? 999 : row.subscription === 'growth' ? 549 : row.subscription === 'professional' || row.subscription === 'pro' ? 299 : row.subscription === 'starter' ? 79 : 0,
+    subscription: row.subscription || 'free',
     isActive: row.is_active ?? true,
     qrCodeUrl: row.qr_code_url || null,
     language: 'en',
@@ -58,13 +57,13 @@ export const mockDb: {
   payments: any[];
 } = {
   vendors: [
-    { id: '1', storeName: "Raju's Chaat Corner", ownerName: "Raju Sharma", phone: "+919876543210", category: "Street Food", plan: "professional", subPaid: 599, isActive: true, qrCodeUrl: null, language: "en", createdAt: new Date().toISOString() },
-    { id: '2', storeName: "Fresh Green Organics", ownerName: "Meena Patel", phone: "+919876543211", category: "Vegetables & Fruits", plan: "starter", subPaid: 299, isActive: true, qrCodeUrl: null, language: "en", createdAt: new Date().toISOString() },
-    { id: '3', storeName: "Al-Noor Meat Shop", ownerName: "Ahmed Khan", phone: "+919876543212", category: "Meat & Seafood", plan: "enterprise", subPaid: 0, isActive: true, qrCodeUrl: null, language: "en", createdAt: new Date().toISOString() },
-    { id: '4', storeName: "Aunty's Dosa Point", ownerName: "Lakshmi Iyer", phone: "+919876543214", category: "Street Food", plan: "starter", subPaid: 0, isActive: true, qrCodeUrl: null, language: "en", createdAt: new Date().toISOString() },
-    { id: '5', storeName: "Preetham's Kabab", ownerName: "Preetham", phone: "+917092006655", category: "Street Food", plan: "free", subPaid: 0, isActive: true, qrCodeUrl: null, language: "en", createdAt: new Date().toISOString() },
-    { id: '6', storeName: "Sai Kirana Store", ownerName: "Suresh Yadav", phone: "+919876543213", category: "Groceries", plan: "free", subPaid: 0, isActive: true, qrCodeUrl: null, language: "en", createdAt: new Date().toISOString() },
-    { id: '7', storeName: "Preetham's Kebab", ownerName: "Preetham", phone: "+919900112233", category: "Street Food", plan: "enterprise", subPaid: 1179, isActive: true, qrCodeUrl: null, language: "en", createdAt: new Date().toISOString() }
+    { id: '1', storeName: "Raju's Chaat Corner", ownerName: "Raju Sharma", phone: "+919876543210", category: "Street Food", subscription: "professional", isActive: true, qrCodeUrl: null, language: "en", createdAt: new Date().toISOString() },
+    { id: '2', storeName: "Fresh Green Organics", ownerName: "Meena Patel", phone: "+919876543211", category: "Vegetables & Fruits", subscription: "starter", isActive: true, qrCodeUrl: null, language: "en", createdAt: new Date().toISOString() },
+    { id: '3', storeName: "Al-Noor Meat Shop", ownerName: "Ahmed Khan", phone: "+919876543212", category: "Meat & Seafood", subscription: "enterprise", isActive: true, qrCodeUrl: null, language: "en", createdAt: new Date().toISOString() },
+    { id: '4', storeName: "Aunty's Dosa Point", ownerName: "Lakshmi Iyer", phone: "+919876543214", category: "Street Food", subscription: "starter", isActive: true, qrCodeUrl: null, language: "en", createdAt: new Date().toISOString() },
+    { id: '5', storeName: "Preetham's Kabab", ownerName: "Preetham", phone: "+917092006655", category: "Street Food", subscription: "free", isActive: true, qrCodeUrl: null, language: "en", createdAt: new Date().toISOString() },
+    { id: '6', storeName: "Sai Kirana Store", ownerName: "Suresh Yadav", phone: "+919876543213", category: "Groceries", subscription: "free", isActive: true, qrCodeUrl: null, language: "en", createdAt: new Date().toISOString() },
+    { id: '7', storeName: "Preetham's Kebab", ownerName: "Preetham", phone: "+919900112233", category: "Street Food", subscription: "enterprise", isActive: true, qrCodeUrl: null, language: "en", createdAt: new Date().toISOString() }
   ],
   products: [
     { id: '101', vendorId: '1', name: 'Pani Puri', price: 40, unit: 'plate', stock: 100, category: 'Snacks' },

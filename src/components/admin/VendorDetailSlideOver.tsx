@@ -70,7 +70,7 @@ export default function VendorDetailSlideOver({ vendor, onClose }: VendorDetailS
 
                                 <div className="flex flex-wrap gap-2">
                                     <span className="px-3 py-1 rounded-full bg-brand-500/10 text-brand-500 text-[10px] font-black uppercase tracking-widest border border-brand-500/20">
-                                        {vendor.plan_tier} Plan
+                                        {vendor.subscription} Plan
                                     </span>
                                     <span className="px-3 py-1 rounded-full bg-bg-surface-inset text-text-secondary text-[10px] font-black uppercase tracking-widest border border-border-subtle">
                                         ID: {vendor.vendor_id.slice(0, 8)}

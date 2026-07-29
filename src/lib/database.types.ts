@@ -6,8 +6,7 @@ export interface Vendor {
     phone: string;
     email?: string;
     category: string;
-    plan: 'free' | 'starter' | 'growth' | 'professional' | 'enterprise';
-    subPaid: number;
+    subscription: 'free' | 'starter' | 'growth' | 'professional' | 'enterprise';
     isActive: boolean;
     qrCodeUrl: string | null;
     language: 'en' | 'hi' | 'ta' | 'kn';
@@ -46,7 +45,7 @@ export interface Order {
 export interface Payment {
     id: string;
     vendorId: string;
-    plan: Vendor['plan'];
+    subscription: Vendor['subscription'];
     amount: number;
     gst: number;
     method: 'upi' | 'card' | 'netbanking';

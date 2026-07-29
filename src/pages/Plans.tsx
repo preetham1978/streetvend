@@ -10,7 +10,7 @@ import { supabase } from '../lib/supabase';
 export default function Plans() {
     const { t } = useI18n();
     const { user, updatePlan } = useAuth();
-    const currentPlan = user?.plan || 'free';
+    const currentPlan = user?.subscription || 'free';
     
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
     const [checkoutPlan, setCheckoutPlan] = useState<{ plan: PlanConfig; cycle: 'monthly' | 'annual'; amount: number } | null>(null);
@@ -380,7 +380,7 @@ export default function Plans() {
                                                 Processing Secure Payment...
                                             </>
                                         ) : (
-                                            `Pay ₹{(checkoutPlan.amount * 1.18).toFixed(2)}`
+                                            `PAY ₹${(checkoutPlan.amount * 1.18).toFixed(2)}`
                                         )}
                                     </button>
                                 </div>

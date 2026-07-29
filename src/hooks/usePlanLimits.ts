@@ -6,7 +6,7 @@ export { PLANS_CONFIG as TIER_CONFIGS, PLAN_TIER_LEVELS, isTierAtLeast };
 
 export function usePlanLimits() {
     const { user, updatePlan } = useAuth();
-    const currentPlan: PlanTier = (user?.plan as PlanTier) || 'free';
+    const currentPlan: PlanTier = (user?.subscription as PlanTier) || 'free';
     const config = PLANS_CONFIG[currentPlan] || PLANS_CONFIG.free;
 
     const hasFeature = (featureKey: string): boolean => {

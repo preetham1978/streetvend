@@ -15,7 +15,8 @@ interface AuthContextType {
     isAdmin: boolean;
     loginAdmin: () => void;
     isSuperAdmin: boolean;
-    updatePlan: (newPlan: Vendor['plan']) => void;
+    updatePlan: (newPlan: Vendor['subscription']) => void;
+    refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -197,22 +198,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('vendor_admin', 'true');
     };
 
-    const updatePlan = (newPlan: Vendor['plan']) => {
-        const subPaidMap: Record<string, number> = {
-            free: 0,
-            starter: 79,
-            professional: 299,
-            growth: 549,
-            enterprise: 999
-        };
-        const updated = user ? { ...user, plan: newPlan, subPaid: subPaidMap[newPlan] } : {
+    const updatePlan = (newPlan: Vendor['subscription']) => {
+        const updated = user ? { ...user, subscription: newPlan } : {
             id: 'v_demo',
             storeName: "Streetvend Partner",
             ownerName: "Vendor",
             phone: "+919876543210",
             category: "Street Food",
-            plan: newPlan,
-            subPaid: subPaidMap[newPlan],
+            subscription: newPlan,
             isActive: true,
             qrCodeUrl: null,
             language: "en" as const,
@@ -220,6 +213,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         setUser(updated);
         localStorage.setItem('vendor_user', JSON.stringify(updated));
+    };
+
+    const refreshProfile = async () => {
+        if (supabase && session?.user) {
+            const profile = await fetchVendorProfile(session.user.id);
+            if (profile) {
+                setUser(profile);
+                localStorage.setItem('vendor_user', JSON.stringify(profile));
+            }
+        }
     };
 
     return (
@@ -236,7 +239,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             isAdmin, 
             loginAdmin, 
             isSuperAdmin,
-            updatePlan 
+            updatePlan,
+            refreshProfile
         }}>
             {children}
         </AuthContext.Provider>

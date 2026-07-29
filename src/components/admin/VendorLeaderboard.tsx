@@ -80,7 +80,7 @@ export default function VendorLeaderboard({ data, onVendorClick }: VendorLeaderb
                                     </div>
                                 </td>
                                 <td className="py-4 px-4 text-center">
-                                    {getPlanPill(vendor.plan_tier)}
+                                    {getPlanPill(vendor.subscription)}
                                 </td>
                                 <td className="py-4 px-4 text-right font-black text-text-secondary">
                                     {vendor.total_orders_30d}

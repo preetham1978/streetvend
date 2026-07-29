@@ -20,7 +20,7 @@ export default function ReEngagementModal({ vendor, onClose }: ReEngagementModal
         {
             id: 'offer',
             label: 'Special Offer',
-            message: `Hi ${vendor.vendor_name}, as a valued ${vendor.plan_tier} partner, we'd love to help you optimize your sales this week. Let's chat!`
+            message: `Hi ${vendor.vendor_name}, as a valued ${vendor.subscription} partner, we'd love to help you optimize your sales this week. Let's chat!`
         },
         {
             id: 'feedback',
@@ -65,7 +65,7 @@ export default function ReEngagementModal({ vendor, onClose }: ReEngagementModal
                                     Re-engage Vendor
                                 </h3>
                                 <p className="text-[10px] text-text-tertiary font-bold uppercase tracking-widest">
-                                    {vendor.vendor_name} · {vendor.plan_tier}
+                                    {vendor.vendor_name} · {vendor.subscription}
                                 </p>
                             </div>
                         </div>

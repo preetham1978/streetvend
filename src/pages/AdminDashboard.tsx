@@ -373,10 +373,10 @@ export default function AdminDashboard() {
                             {filteredVendors.map((vendor) => {
                                 const meta = vendorMetaMap[vendor.storeName] || {
                                     planIcon: "⚡",
-                                    planLabel: vendor.plan,
+                                    planLabel: vendor.subscription,
                                     ordersCount: 1,
                                     gmv: "250",
-                                    subPaid: vendor.subPaid.toString()
+                                    subPaid: (PLANS_CONFIG[vendor.subscription as PlanTier]?.monthlyPrice || 0).toString()
                                 };
 
                                 return (
@@ -398,17 +398,17 @@ export default function AdminDashboard() {
                                                 </p>
                                                 <p className="text-xs text-text-primary font-medium">
                                                     <span>{
-                                                        vendor.plan === 'enterprise' ? '👑' :
-                                                        vendor.plan === 'growth' ? '🚀' :
-                                                        vendor.plan === 'professional' ? '⚡' :
-                                                        vendor.plan === 'starter' ? '🔥' : '🌱'
-                                                    } {PLANS_CONFIG[vendor.plan as PlanTier]?.name || vendor.plan}</span>
+                                                        vendor.subscription === 'enterprise' ? '👑' :
+                                                        vendor.subscription === 'growth' ? '🚀' :
+                                                        vendor.subscription === 'professional' ? '⚡' :
+                                                        vendor.subscription === 'starter' ? '🔥' : '🌱'
+                                                    } {PLANS_CONFIG[vendor.subscription as PlanTier]?.name || vendor.subscription}</span>
                                                     <span className="mx-1 font-bold text-text-tertiary">·</span>
                                                     <span>{meta.ordersCount} orders</span>
                                                     <span className="mx-1 font-bold text-text-tertiary">·</span>
                                                     <span>₹{meta.gmv}</span>
                                                     <span className="mx-1 font-bold text-text-tertiary">·</span>
-                                                    <span>sub paid ₹{vendor.subPaid > 0 ? vendor.subPaid : (PLANS_CONFIG[vendor.plan as PlanTier]?.monthlyPrice || 0)}</span>
+                                                    <span>sub paid ₹{(PLANS_CONFIG[vendor.subscription as PlanTier]?.monthlyPrice || 0)}</span>
                                                     <span className="mx-1 font-bold text-text-tertiary">·</span>
                                                     <span className={vendor.qrCodeUrl ? "text-emerald-500 font-bold" : "text-text-secondary"}>
                                                         {vendor.qrCodeUrl ? "QR Uploaded" : "No QR"}
@@ -475,13 +475,13 @@ export default function AdminDashboard() {
                                 </thead>
                                 <tbody className="divide-y divide-border-subtle">
                                     {vendors.map(v => {
-                                        const pCfg = PLANS_CONFIG[v.plan as PlanTier] || PLANS_CONFIG.free;
-                                        const pIcon = v.plan === 'enterprise' ? '👑' : v.plan === 'growth' ? '🚀' : v.plan === 'professional' ? '⚡' : v.plan === 'starter' ? '🔥' : '🌱';
+                                        const pCfg = PLANS_CONFIG[v.subscription as PlanTier] || PLANS_CONFIG.free;
+                                        const pIcon = v.subscription === 'enterprise' ? '👑' : v.subscription === 'growth' ? '🚀' : v.subscription === 'professional' ? '⚡' : v.subscription === 'starter' ? '🔥' : '🌱';
                                         const meta = vendorMetaMap[v.storeName] || {
                                             ordersCount: 1,
                                             gmv: "250"
                                         };
-                                        const displaySubPaid = v.subPaid > 0 ? v.subPaid : pCfg.monthlyPrice;
+                                        const displaySubPaid = pCfg.monthlyPrice;
                                         return (
                                             <tr key={v.id} className="hover:bg-bg-base/50 transition-colors">
                                                 <td className="py-3.5 px-4 font-bold text-text-primary">{v.storeName}</td>
