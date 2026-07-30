@@ -431,12 +431,26 @@ export default function ProductsPage() {
                             <ShoppingBag className="w-5 h-5" /> Quick Add Templates
                         </button>
                     )}
-                    <button
-                        onClick={openAddModal}
-                        className="flex items-center justify-center gap-2 px-6 py-4 rounded-2xl primary-button-gradient text-white font-bold text-xs uppercase tracking-widest shadow-xl shadow-brand-500/20 hover:scale-[1.02] active:scale-95 transition-all w-full md:w-auto min-h-[44px]"
-                    >
-                        <Plus className="w-5 h-5" /> Add Product
-                    </button>
+                    
+                    <div className="relative group w-full md:w-auto">
+                        <button
+                            onClick={openAddModal}
+                            disabled={!canAddProduct(products.length)}
+                            className={cn(
+                                "flex items-center justify-center gap-2 px-6 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl transition-all w-full min-h-[44px]",
+                                canAddProduct(products.length)
+                                    ? "primary-button-gradient text-white shadow-brand-500/20 hover:scale-[1.02] active:scale-95"
+                                    : "bg-bg-base border border-border-subtle text-text-tertiary cursor-not-allowed shadow-none"
+                            )}
+                        >
+                            <Plus className="w-5 h-5" /> Add Product
+                        </button>
+                        {!canAddProduct(products.length) && (
+                            <div className="absolute top-full mt-2 right-0 w-64 bg-bg-surface-inset border border-border-subtle rounded-xl p-3 text-xs text-text-secondary opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 shadow-lg text-center">
+                                Free plan limit reached ({planConfig.maxProducts} products). Existing products are kept. Upgrade to add more.
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 

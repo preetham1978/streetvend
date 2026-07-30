@@ -1,15 +1,15 @@
 import { useState, ReactNode } from 'react';
-import { ShieldCheck, IndianRupee, Check, Star, Flame, Zap, Rocket, Crown, ArrowRight, ChevronDown, X, Loader2, CreditCard, Smartphone, Sparkles, Calendar } from 'lucide-react';
+import { ShieldCheck, IndianRupee, Check, Star, Flame, Zap, Rocket, Crown, ArrowRight, ChevronDown, X, Loader2, CreditCard, Smartphone, Sparkles, Calendar, AlertCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useI18n } from '../lib/I18nContext';
 import { useAuth } from '../lib/auth';
-import { PLANS_CONFIG, PlanTier, PlanConfig } from '../config/pricing';
+import { PLANS_CONFIG, PlanTier, PlanConfig, isTierAtLeast } from '../config/pricing';
 import { supabase } from '../lib/supabase';
 
 export default function Plans() {
     const { t } = useI18n();
-    const { user, updatePlan } = useAuth();
+    const { user, updatePlan, updateUser, refreshProfile } = useAuth();
     const currentPlan = user?.subscription || 'free';
     
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
@@ -21,14 +21,83 @@ export default function Plans() {
 
     const planList = Object.values(PLANS_CONFIG) as PlanConfig[];
 
+    const [isDowngradeModalOpen, setIsDowngradeModalOpen] = useState(false);
+    const [downgradeTarget, setDowngradeTarget] = useState<PlanConfig | null>(null);
+
     const handleOpenCheckout = (plan: PlanConfig) => {
-        if (plan.id === 'free') {
-            updatePlan('free');
+        const isDowngrade = !isTierAtLeast(plan.id, currentPlan);
+        
+        if (isDowngrade) {
+            setDowngradeTarget(plan);
+            setIsDowngradeModalOpen(true);
             return;
         }
+
+        if (plan.id === 'free') {
+            // Cannot manually checkout to free if it wasn't a downgrade, this shouldn't be possible to click anyway
+            return;
+        }
+
         const amount = billingCycle === 'annual' ? plan.annualTotalPrice : plan.monthlyPrice;
         setCheckoutPlan({ plan, cycle: billingCycle, amount });
         setIsSuccess(false);
+    };
+
+    const handleScheduleDowngrade = async () => {
+        if (!downgradeTarget || !user) return;
+        setIsProcessing(true);
+        const effectiveDate = new Date();
+        effectiveDate.setDate(effectiveDate.getDate() + 30);
+        const effectiveDateStr = effectiveDate.toISOString();
+
+        try {
+            if (supabase) {
+                try {
+                    const res = await fetch('/api/vendor/schedule-downgrade', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ targetPlan: downgradeTarget.id, vendorId: user.id })
+                    });
+                    const data = await res.json();
+                    if (data && data.success) {
+                        await refreshProfile();
+                    } else {
+                        await (supabase.from('vendors') as any)
+                            .update({
+                                scheduled_downgrade: downgradeTarget.id,
+                                downgrade_effective_date: effectiveDateStr,
+                                billing_period_end: effectiveDateStr
+                            })
+                            .eq('id', user.id);
+                        
+                        updateUser({
+                            scheduledDowngrade: downgradeTarget.id,
+                            downgradeEffectiveDate: effectiveDateStr,
+                            billingPeriodEnd: effectiveDateStr
+                        });
+                    }
+                } catch (e) {
+                    console.error("Schedule downgrade error:", e);
+                    updateUser({
+                        scheduledDowngrade: downgradeTarget.id,
+                        downgradeEffectiveDate: effectiveDateStr,
+                        billingPeriodEnd: effectiveDateStr
+                    });
+                }
+            } else {
+                updateUser({
+                    scheduledDowngrade: downgradeTarget.id,
+                    downgradeEffectiveDate: effectiveDateStr,
+                    billingPeriodEnd: effectiveDateStr
+                });
+            }
+            setIsDowngradeModalOpen(false);
+            setDowngradeTarget(null);
+        } catch (err) {
+            console.error("Failed to schedule downgrade:", err);
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     const handleConfirmPayment = async () => {
@@ -224,20 +293,68 @@ export default function Plans() {
                                     </div>
                                 </div>
 
-                                <button
-                                    onClick={() => handleOpenCheckout(plan)}
-                                    disabled={isCurrent}
-                                    className={cn(
-                                        "w-full py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg cursor-pointer flex items-center justify-center gap-2",
-                                        isCurrent
-                                            ? "bg-bg-base text-text-tertiary border border-border-subtle cursor-not-allowed shadow-none"
-                                            : plan.popular
-                                                ? "primary-button-gradient text-white shadow-brand-500/20 hover:scale-[1.02]"
-                                                : "bg-bg-base border border-border-subtle hover:border-brand-500 text-text-primary"
-                                    )}
-                                >
-                                    {isCurrent ? 'Current Plan' : plan.id === 'free' ? 'Get Started' : `Upgrade to ${plan.name}`}
-                                </button>
+                                {(() => {
+                                    const isDowngradeTarget = !isTierAtLeast(plan.id, currentPlan) && !isCurrent;
+                                    const isScheduledDowngrade = user?.scheduledDowngrade === plan.id;
+                                    
+                                    if (isScheduledDowngrade) {
+                                        return (
+                                            <button
+                                                disabled
+                                                className="w-full py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider cursor-not-allowed flex items-center justify-center gap-2 bg-amber-500/10 text-amber-600 border border-amber-500/30"
+                                            >
+                                                Downgrade Scheduled
+                                            </button>
+                                        );
+                                    }
+                                    
+                                    if (isCurrent) {
+                                        return (
+                                            <div className="flex flex-col gap-2">
+                                                <button
+                                                    disabled
+                                                    className="w-full py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider bg-bg-base text-text-tertiary border border-border-subtle cursor-not-allowed flex items-center justify-center"
+                                                >
+                                                    Current Plan
+                                                </button>
+                                                {/* Only show subtle downgrade link if we aren't currently free, and haven't scheduled one yet */}
+                                                {!user?.scheduledDowngrade && currentPlan !== 'free' && (
+                                                    <div className="text-center mt-1">
+                                                        <span className="text-[10px] text-text-tertiary">Select a lower plan to downgrade</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    }
+                                    
+                                    if (plan.id === 'free') {
+                                        return (
+                                            <button
+                                                disabled={isCurrent}
+                                                onClick={() => handleOpenCheckout(plan)}
+                                                className="w-full py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg cursor-pointer flex items-center justify-center gap-2 bg-bg-base border border-border-subtle hover:border-brand-500 text-text-primary"
+                                            >
+                                                {isDowngradeTarget ? 'Switch to Free' : 'Get Started'}
+                                            </button>
+                                        );
+                                    }
+
+                                    return (
+                                        <button
+                                            onClick={() => handleOpenCheckout(plan)}
+                                            className={cn(
+                                                "w-full py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg cursor-pointer flex items-center justify-center gap-2",
+                                                isDowngradeTarget 
+                                                    ? "bg-bg-base border border-border-subtle hover:border-brand-500 text-text-primary"
+                                                    : plan.popular
+                                                        ? "primary-button-gradient text-white shadow-brand-500/20 hover:scale-[1.02]"
+                                                        : "bg-bg-base border border-border-subtle hover:border-brand-500 text-text-primary"
+                                            )}
+                                        >
+                                            {isDowngradeTarget ? `Switch to ${plan.name}` : `Upgrade to ${plan.name}`}
+                                        </button>
+                                    );
+                                })()}
                             </div>
                         );
                     })}
@@ -295,6 +412,66 @@ export default function Plans() {
                     </div>
                 </div>
             </div>
+
+            {/* Downgrade Modal */}
+            <AnimatePresence>
+                {isDowngradeModalOpen && downgradeTarget && user && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => !isProcessing && setIsDowngradeModalOpen(false)}
+                            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-bg-surface w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden border border-border-subtle relative z-10"
+                        >
+                            <div className="p-6 sm:p-8">
+                                <h3 className="font-display font-bold text-xl mb-4">Schedule Plan Downgrade</h3>
+                                <div className="space-y-4 text-text-secondary text-sm">
+                                    <p>
+                                        Your plan will change from <span className="font-bold text-text-primary">{PLANS_CONFIG[currentPlan as PlanTier].name}</span> to <span className="font-bold text-text-primary">{downgradeTarget.name}</span> at the end of your current billing period.
+                                    </p>
+                                    <p>
+                                        You'll keep all <strong>{PLANS_CONFIG[currentPlan as PlanTier].name}</strong> features until then.
+                                    </p>
+                                    <div className="bg-amber-500/10 p-4 rounded-xl border border-amber-500/20 text-amber-700 dark:text-amber-400 mt-4">
+                                        <p className="font-bold mb-2 flex items-center gap-2">
+                                            <AlertCircle className="w-4 h-4" />
+                                            Important Limits
+                                        </p>
+                                        <ul className="list-disc pl-5 space-y-1">
+                                            <li>Your product limit will be reduced to {downgradeTarget.maxProducts === Infinity ? 'Unlimited' : downgradeTarget.maxProducts}.</li>
+                                            <li>Existing products are kept, but you won't be able to add new ones if over the limit.</li>
+                                            <li>Some AI features may become restricted based on the {downgradeTarget.name} plan tier.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div className="mt-8 flex flex-col sm:flex-row gap-3 sm:justify-end">
+                                    <button
+                                        onClick={() => setIsDowngradeModalOpen(false)}
+                                        disabled={isProcessing}
+                                        className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider border border-border-subtle hover:bg-bg-base transition-colors"
+                                    >
+                                        Keep Current Plan
+                                    </button>
+                                    <button
+                                        onClick={handleScheduleDowngrade}
+                                        disabled={isProcessing}
+                                        className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider bg-amber-500 hover:bg-amber-600 text-white transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Schedule Downgrade'}
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
             {/* Checkout Modal */}
             <AnimatePresence>

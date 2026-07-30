@@ -7,6 +7,9 @@ export interface Vendor {
     email?: string;
     category: string;
     subscription: 'free' | 'starter' | 'growth' | 'professional' | 'enterprise';
+    scheduledDowngrade?: 'free' | 'starter' | 'growth' | 'professional' | null;
+    downgradeEffectiveDate?: string | null;
+    billingPeriodEnd?: string | null;
     isActive: boolean;
     qrCodeUrl: string | null;
     language: 'en' | 'hi' | 'ta' | 'kn';

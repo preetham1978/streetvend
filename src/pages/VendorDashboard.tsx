@@ -2,7 +2,7 @@ import { useState, useEffect, ReactNode } from 'react';
 import { useAuth } from '../lib/auth';
 import { mockDb, supabase, mapProductFromDb, mapOrderFromDb } from '../lib/supabase';
 import { Product, Order } from '../lib/database.types';
-import { Plus, Box, QrCode, Bot, CreditCard, Send, Loader2, X, ChevronRight, ShoppingCart, BarChart3, Sparkles, MessageCircle } from 'lucide-react';
+import { Plus, Box, QrCode, Bot, CreditCard, Send, Loader2, X, ChevronRight, ShoppingCart, BarChart3, Sparkles, MessageCircle, AlertCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -65,7 +65,7 @@ const MOCK_DASHBOARD_STATS = {
 
 export default function VendorDashboard() {
     const { t } = useI18n();
-    const { user, isLoading, updatePlan, refreshProfile } = useAuth();
+    const { user, isLoading, updatePlan, updateUser, refreshProfile } = useAuth();
     console.log("VendorDashboard user object:", user);
     const navigate = useNavigate();
     const [products, setProducts] = useState<Product[]>([]);
@@ -243,6 +243,46 @@ export default function VendorDashboard() {
         <div className="min-h-screen pt-28 pb-12 bg-bg-base">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 
+                {/* Downgrade Banner */}
+                {user.scheduledDowngrade && user.downgradeEffectiveDate && (
+                    <div className="mb-6 p-4 rounded-[1.5rem] bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="flex items-start sm:items-center gap-3 text-amber-600 dark:text-amber-400">
+                            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 sm:mt-0" />
+                            <div className="text-sm font-medium">
+                                ⚠️ Your plan changes to <span className="font-bold uppercase tracking-widest">{user.scheduledDowngrade}</span> on <span className="font-bold">{new Date(user.downgradeEffectiveDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>. You keep all current features until then.
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        if (supabase) {
+                                            const res = await fetch('/api/vendor/cancel-downgrade', {
+                                                method: 'DELETE',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ vendorId: user.id })
+                                            });
+                                            if (res.ok) {
+                                                await refreshProfile();
+                                            }
+                                        } else {
+                                            updateUser({
+                                                scheduledDowngrade: null,
+                                                downgradeEffectiveDate: null
+                                            });
+                                        }
+                                    } catch (err) {
+                                        console.error("Cancel downgrade error", err);
+                                    }
+                                }}
+                                className="px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 font-bold text-xs uppercase tracking-wider transition-colors"
+                            >
+                                Cancel Downgrade
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Header Card */}
                 <div data-tour="store-header" className="bg-bg-surface rounded-[2.5rem] p-6 sm:p-10 border border-border-subtle shadow-2xl mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 overflow-hidden relative">
                     <div className="absolute inset-0 hero-glow opacity-30 pointer-events-none"></div>

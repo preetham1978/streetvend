@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { Phone, ArrowRight, UserCircle2, Lock, Sparkles } from 'lucide-react';
+import { ArrowRight, Lock, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useI18n } from '../lib/I18nContext';
-import { supabase } from '../lib/supabase';
 
 // TODO: Manual configuration in Supabase Dashboard -> Auth -> Providers -> Phone
 // Enable Phone provider. Configure SMS Provider (e.g., Twilio for India).
@@ -16,7 +15,7 @@ import { supabase } from '../lib/supabase';
 
 export default function Login() {
     const { t } = useI18n();
-    const { loginWithEmail, verifyOtp, login } = useAuth();
+    const { loginWithEmail, verifyOtp } = useAuth();
     const navigate = useNavigate();
 
     const [email, setEmail] = useState('');
@@ -28,35 +27,6 @@ export default function Login() {
     const [infoMsg, setInfoMsg] = useState('');
 
     const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-    const [demoAccounts, setDemoAccounts] = useState<any[]>([]);
-
-    useEffect(() => {
-        const fetchDemoAccounts = async () => {
-            if (supabase) {
-                const { data, error } = await supabase
-                    .from('vendors')
-                    .select('name, email')
-                    .limit(7);
-                
-                if (data && !error) {
-                    setDemoAccounts(data);
-                } else {
-                    // Fallback to hardcoded list if DB is empty or fails
-                    setDemoAccounts([
-                        { name: "Raju's Chaat Corner", email: "raju@example.com" },
-                        { name: "Fresh Green Organics", email: "meena@example.com" },
-                        { name: "Al-Noor Meat Shop", email: "ahmed@example.com" },
-                        { name: "Aunty's Dosa Point", email: "lakshmi@example.com" },
-                        { name: "Preetham's Kabab", email: "preetham@example.com" },
-                        { name: "Sai Kirana Store", email: "suresh@example.com" },
-                        { name: "Preetham's Kebab", email: "preetham.demo@example.com" }
-                    ]);
-                }
-            }
-        };
-        fetchDemoAccounts();
-    }, []);
 
     useEffect(() => {
         if (countdown > 0) {
@@ -132,26 +102,6 @@ export default function Login() {
     const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Backspace' && !otp[index] && index > 0) {
             otpRefs.current[index - 1]?.focus();
-        }
-    };
-
-    const handleQuickLogin = async (targetEmail: string) => {
-        setEmail(targetEmail);
-        setIsSubmitting(true);
-        setErrorMsg('');
-        setInfoMsg('');
-        
-        try {
-            // In a real environment, we would still need OTP.
-            // But for demo ease, we can call a mock login or trigger OTP.
-            // Let's trigger OTP so the flow is consistent.
-            await loginWithEmail(targetEmail);
-            setStep('verify');
-            setInfoMsg(`[Demo Mode] OTP sent to ${targetEmail}`);
-        } catch (err: any) {
-            setErrorMsg(err?.message || 'Demo login failed');
-        } finally {
-            setIsSubmitting(false);
         }
     };
 
@@ -275,23 +225,6 @@ export default function Login() {
                             </button>
                         </form>
                     )}
-
-                    <div className="bg-bg-base/50 rounded-[1.5rem] p-6 border border-border-subtle mb-8">
-                        <p className="text-[10px] font-bold text-text-tertiary mb-4 uppercase tracking-widest">Quick Demo Access:</p>
-                        <div className="grid grid-cols-1 gap-2">
-                            {demoAccounts.map((account, i) => (
-                                <button
-                                    key={i}
-                                    type="button"
-                                    onClick={() => handleQuickLogin(account.email)}
-                                    className="w-full text-left flex justify-between items-center px-4 py-3 rounded-xl hover:bg-brand-500/5 transition-all border border-transparent hover:border-brand-500/20 group"
-                                >
-                                    <span className="text-xs font-bold text-text-secondary group-hover:text-text-primary transition-colors">{account.name}</span>
-                                    <span className="text-[10px] text-text-tertiary font-bold group-hover:text-brand-500">{account.email}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
 
                     <div className="flex flex-col gap-4 text-center">
                         <p className="text-xs text-text-tertiary font-bold uppercase tracking-widest">

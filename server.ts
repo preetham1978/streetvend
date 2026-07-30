@@ -415,6 +415,159 @@ async function startServer() {
     }
   });
 
+  app.post("/api/vendor/schedule-downgrade", async (req, res) => {
+    try {
+      const { targetPlan, vendorId } = req.body;
+      if (!targetPlan || !vendorId) {
+        return res.status(400).json({ error: "Missing parameters" });
+      }
+
+      const supabaseAdmin = getSupabaseAdmin();
+      if (!supabaseAdmin) {
+         return res.status(500).json({ error: "Database connection unavailable" });
+      }
+
+      // Check current plan and ensure target is a downgrade
+      const { data: vendor, error: vendorError } = await supabaseAdmin
+        .from('vendors')
+        .select('subscription')
+        .eq('id', vendorId)
+        .single();
+      
+      if (vendorError || !vendor) {
+        return res.status(404).json({ error: "Vendor not found" });
+      }
+
+      // Basic validation (you'd ideally have a numeric tier system to strictly enforce downgrade direction)
+      if (targetPlan === vendor.subscription) {
+         return res.status(400).json({ error: "Target plan is same as current plan" });
+      }
+      
+      // Calculate effective date based on last payment
+      const { data: lastPayment } = await supabaseAdmin
+         .from('subscription_payments')
+         .select('paid_at, amount')
+         .eq('vendor_id', vendorId)
+         .eq('status', 'success')
+         .order('paid_at', { ascending: false })
+         .limit(1)
+         .single();
+         
+      let effectiveDate = new Date();
+      effectiveDate.setDate(effectiveDate.getDate() + 30); // Default to +30 days if no payment found
+      
+      if (lastPayment) {
+          const paidAt = new Date(lastPayment.paid_at);
+          // Rough check for annual vs monthly based on amount 
+          // A proper implementation would store the billing_cycle in the payments table
+          if (lastPayment.amount > 1000) { 
+              effectiveDate = new Date(paidAt.getFullYear() + 1, paidAt.getMonth(), paidAt.getDate());
+          } else {
+              effectiveDate = new Date(paidAt.getFullYear(), paidAt.getMonth() + 1, paidAt.getDate());
+          }
+      }
+
+      const effectiveDateStr = effectiveDate.toISOString();
+
+      const { error: updateError } = await supabaseAdmin
+        .from('vendors')
+        .update({
+          scheduled_downgrade: targetPlan,
+          downgrade_effective_date: effectiveDateStr,
+          billing_period_end: effectiveDateStr
+        })
+        .eq('id', vendorId);
+
+      if (updateError) {
+        throw updateError;
+      }
+      
+      res.json({ success: true, effectiveDate: effectiveDateStr });
+
+    } catch (err: any) {
+      console.error("Schedule downgrade error:", err);
+      res.status(500).json({ error: err.message || "Failed to schedule downgrade" });
+    }
+  });
+
+  app.delete("/api/vendor/cancel-downgrade", async (req, res) => {
+      try {
+          const { vendorId } = req.body;
+          if (!vendorId) {
+             return res.status(400).json({ error: "Missing vendorId" });
+          }
+
+          const supabaseAdmin = getSupabaseAdmin();
+          if (!supabaseAdmin) {
+             return res.status(500).json({ error: "Database connection unavailable" });
+          }
+
+          const { error: updateError } = await supabaseAdmin
+            .from('vendors')
+            .update({
+              scheduled_downgrade: null,
+              downgrade_effective_date: null,
+              billing_period_end: null
+            })
+            .eq('id', vendorId);
+            
+          if (updateError) {
+             throw updateError;
+          }
+
+          res.json({ success: true });
+      } catch (err: any) {
+          console.error("Cancel downgrade error:", err);
+          res.status(500).json({ error: err.message || "Failed to cancel downgrade" });
+      }
+  });
+
+  app.post("/api/vendor/apply-downgrade", async (req, res) => {
+      try {
+          const { vendorId, targetPlan, currentPlan } = req.body;
+          if (!vendorId || !targetPlan) {
+              return res.status(400).json({ error: "Missing parameters" });
+          }
+
+          const supabaseAdmin = getSupabaseAdmin();
+          if (supabaseAdmin) {
+            await supabaseAdmin
+              .from('vendors')
+              .update({
+                subscription: targetPlan,
+                scheduled_downgrade: null,
+                downgrade_effective_date: null,
+                billing_period_end: null
+              })
+              .eq('id', vendorId);
+
+            const { error: paymentError } = await supabaseAdmin
+              .from('subscription_payments')
+              .insert([{
+                  id: `DG_${Date.now()}_${vendorId}`,
+                  vendor_id: vendorId,
+                  tier: targetPlan,
+                  plan_name: targetPlan,
+                  amount: 0,
+                  status: 'downgrade',
+                  method: 'system',
+                  payer_detail: `Downgrade to ${targetPlan} from ${currentPlan || 'unknown'}`,
+                  created_at: new Date().toISOString(),
+                  paid_at: new Date().toISOString()
+              }]);
+
+            if (paymentError) {
+               console.error("Error inserting downgrade payment record:", paymentError);
+            }
+          }
+
+          res.json({ success: true });
+      } catch (err: any) {
+          console.error("Apply downgrade error:", err);
+          res.status(500).json({ error: "Failed to apply downgrade log" });
+      }
+  });
+
   app.post("/api/vision-scan", async (req, res) => {
     try {
       const { image, products, language } = req.body || {};

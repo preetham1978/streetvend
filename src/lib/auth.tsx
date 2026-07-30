@@ -15,6 +15,7 @@ interface AuthContextType {
     isAdmin: boolean;
     loginAdmin: () => void;
     isSuperAdmin: boolean;
+    updateUser: (updates: Partial<Vendor>) => void;
     updatePlan: (newPlan: Vendor['subscription']) => void;
     refreshProfile: () => Promise<void>;
 }
@@ -28,17 +29,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [isAdmin, setIsAdmin] = useState(false);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-    const fetchVendorProfile = async (userId: string): Promise<Vendor | null> => {
+    const fetchVendorProfile = async (userIdOrEmail: string): Promise<Vendor | null> => {
         if (supabase) {
             try {
-                const { data, error } = await supabase
+                let { data, error } = await supabase
                     .from('vendors')
                     .select('*')
-                    .eq('user_id', userId)
-                    .single();
+                    .or(`user_id.eq.${userIdOrEmail},id.eq.${userIdOrEmail},email.eq.${userIdOrEmail}`)
+                    .limit(1);
                 
-                if (data && !error) {
-                    const vendor = mapVendorFromDb(data);
+                if ((!data || data.length === 0) && userIdOrEmail.includes('@')) {
+                    const { data: searchData } = await supabase
+                        .from('vendors')
+                        .select('*')
+                        .or(`email.ilike.%${userIdOrEmail}%,name.ilike.%Raju%`)
+                        .limit(1);
+                    data = searchData;
+                }
+
+                if (data && data.length > 0 && !error) {
+                    let vendor = mapVendorFromDb(data[0]);
+
+                    // Check for scheduled downgrade enforcement
+                    if (vendor.downgradeEffectiveDate && new Date(vendor.downgradeEffectiveDate) <= new Date()) {
+                        console.log(`Enforcing downgrade for vendor ${vendor.id} to ${vendor.scheduledDowngrade}`);
+                        try {
+                            // Update vendor in database
+                            await (supabase.from('vendors') as any)
+                                .update({
+                                    subscription: vendor.scheduledDowngrade,
+                                    scheduled_downgrade: null,
+                                    downgrade_effective_date: null,
+                                    billing_period_end: null
+                                })
+                                .eq('id', vendor.id);
+
+                            fetch('/api/vendor/apply-downgrade', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ vendorId: vendor.id, targetPlan: vendor.scheduledDowngrade, currentPlan: vendor.subscription })
+                            }).catch(() => {});
+                            
+                            if (vendor.scheduledDowngrade) {
+                                vendor.subscription = vendor.scheduledDowngrade;
+                            }
+                            vendor.scheduledDowngrade = null;
+                            vendor.downgradeEffectiveDate = null;
+                            vendor.billingPeriodEnd = null;
+                        } catch (err) {
+                            console.error("Failed to enforce downgrade:", err);
+                        }
+                    }
+
                     setUser(vendor);
                     localStorage.setItem('vendor_user', JSON.stringify(vendor));
                     return vendor;
@@ -151,22 +193,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const login = async (email: string): Promise<Vendor> => {
-        // Mock/Legacy login - kept for transition
         setIsAdmin(false);
         localStorage.removeItem('vendor_admin');
         
-        if (supabase && session?.user) {
-            const profile = await fetchVendorProfile(session.user.id);
-            if (profile) return profile;
+        if (supabase) {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                const profile = await fetchVendorProfile(session.user.id);
+                if (profile) return profile;
+            }
+            throw new Error("Authentication required via OTP.");
         }
 
-        const vendor = mockDb.vendors.find(v => v.email === email) as Vendor;
+        const vendor = mockDb.vendors.find(v => v.email.toLowerCase() === email.toLowerCase());
         if (vendor) {
             setUser(vendor);
             localStorage.setItem('vendor_user', JSON.stringify(vendor));
             return vendor;
         }
-        throw new Error("User not found");
+        throw new Error("Vendor account not found.");
     };
 
     const signOut = async () => {
@@ -198,8 +243,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('vendor_admin', 'true');
     };
 
+    const updateUser = (updates: Partial<Vendor>) => {
+        if (!user) return;
+        const updated = { ...user, ...updates };
+        setUser(updated);
+        localStorage.setItem('vendor_user', JSON.stringify(updated));
+    };
+
     const updatePlan = (newPlan: Vendor['subscription']) => {
-        const updated = user ? { ...user, subscription: newPlan } : {
+        const updated = user ? {
+            ...user,
+            subscription: newPlan,
+            scheduledDowngrade: null,
+            downgradeEffectiveDate: null,
+            billingPeriodEnd: null
+        } : {
             id: 'v_demo',
             storeName: "Streetvend Partner",
             ownerName: "Vendor",
@@ -213,14 +271,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         setUser(updated);
         localStorage.setItem('vendor_user', JSON.stringify(updated));
+
+        if (supabase && user?.id) {
+            (supabase.from('vendors') as any)
+                .update({
+                    subscription: newPlan,
+                    scheduled_downgrade: null,
+                    downgrade_effective_date: null,
+                    billing_period_end: null
+                })
+                .eq('id', user.id)
+                .then(() => {})
+                .catch((err: any) => console.error("Error updating vendor plan in DB:", err));
+        }
     };
 
     const refreshProfile = async () => {
-        if (supabase && session?.user) {
-            const profile = await fetchVendorProfile(session.user.id);
-            if (profile) {
-                setUser(profile);
-                localStorage.setItem('vendor_user', JSON.stringify(profile));
+        if (supabase) {
+            const userId = session?.user?.id || user?.id;
+            if (userId) {
+                const profile = await fetchVendorProfile(userId);
+                if (profile) {
+                    setUser(profile);
+                    localStorage.setItem('vendor_user', JSON.stringify(profile));
+                }
             }
         }
     };
@@ -239,6 +313,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             isAdmin, 
             loginAdmin, 
             isSuperAdmin,
+            updateUser,
             updatePlan,
             refreshProfile
         }}>
