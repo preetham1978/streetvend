@@ -103,13 +103,13 @@ export default function DeviceSessionManager({
 
             {/* Dropdown Container */}
             <div 
-                className="absolute right-0 top-full mt-3 w-80 sm:w-96 bg-[#141416] border border-[#28282e] rounded-3xl p-6 shadow-2xl z-50 text-left cursor-default animate-in fade-in-0 slide-in-from-top-2 duration-200"
+                className="absolute right-0 top-full mt-3 w-80 sm:w-96 bg-bg-surface border border-border-subtle rounded-3xl p-6 shadow-2xl z-50 text-left cursor-default animate-in fade-in-0 slide-in-from-top-2 duration-200"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Close Button Header */}
                 <button
                     onClick={onClose}
-                    className="absolute top-5 right-5 p-2 rounded-full text-text-tertiary hover:text-text-primary hover:bg-[#222228] transition-all cursor-pointer z-10"
+                    className="absolute top-5 right-5 p-2 rounded-full text-text-tertiary hover:text-text-primary hover:bg-bg-surface-inset transition-all cursor-pointer z-10"
                     aria-label="Close device session manager"
                 >
                     <X className="w-5 h-5" />
@@ -130,14 +130,14 @@ export default function DeviceSessionManager({
                 </div>
 
                 {/* Device Count Progress Bar */}
-                <div className="bg-[#1b1b1e] p-4.5 rounded-2xl border border-[#2d2d34] mb-6">
+                <div className="bg-bg-surface-inset p-4.5 rounded-2xl border border-border-subtle mb-6">
                     <div className="flex justify-between items-center mb-2.5 text-xs font-bold">
                         <span className="text-text-secondary">Active Devices</span>
                         <span className={isExceedingLimit ? 'text-red-400 font-extrabold' : 'text-brand-500 font-extrabold'}>
                             {activeSessionCount} / {maxDevices} Device{maxDevices > 1 ? 's' : ''}
                         </span>
                     </div>
-                    <div className="h-2.5 bg-[#26262c] rounded-full overflow-hidden shadow-inner">
+                    <div className="h-2.5 bg-border-subtle rounded-full overflow-hidden shadow-inner">
                         <div
                             className={`h-full rounded-full transition-all duration-500 ${
                                 isExceedingLimit ? 'bg-red-500' : 'bg-brand-500'
@@ -170,11 +170,11 @@ export default function DeviceSessionManager({
                             className={`p-4 rounded-2xl border flex items-center justify-between transition-all gap-4 ${
                                 s.isCurrent
                                     ? 'bg-brand-500/10 border-brand-500/30'
-                                    : 'bg-[#18181c] border-[#292930] hover:border-brand-500/20'
+                                    : 'bg-bg-surface-inset border-border-subtle hover:border-brand-500/20'
                             }`}
                         >
                             <div className="flex items-center gap-3.5 min-w-0">
-                                <div className="p-3 rounded-xl bg-[#222228] shrink-0 flex items-center justify-center">
+                                <div className="p-3 rounded-xl bg-bg-surface-inset shrink-0 flex items-center justify-center">
                                     {getDeviceIcon(s.deviceType)}
                                 </div>
                                 <div className="min-w-0">
@@ -206,7 +206,7 @@ export default function DeviceSessionManager({
                 </div>
 
                 {/* Bottom Actions Footer */}
-                <div className="flex items-center justify-between pt-5 mt-6 border-t border-[#28282e]">
+                <div className="flex items-center justify-between pt-5 mt-6 border-t border-border-subtle">
                     <span className="text-xs font-semibold text-text-secondary flex items-center gap-1.5">
                         Plan: <strong className="text-brand-500 font-extrabold capitalize">{currentPlan}</strong>
                     </span>

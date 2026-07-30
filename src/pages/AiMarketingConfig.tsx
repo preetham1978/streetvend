@@ -170,7 +170,7 @@ STRICT REQUIREMENT:
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                     <button
                         onClick={() => applyPreset('kebab')}
-                        className="p-3.5 rounded-2xl bg-[#1a1a1e] hover:bg-[#222228] border border-border-subtle hover:border-brand-500/50 text-left transition-all cursor-pointer group"
+                        className="p-3.5 rounded-2xl bg-bg-surface-inset hover:bg-bg-surface-inset border border-border-subtle hover:border-brand-500/50 text-left transition-all cursor-pointer group"
                     >
                         <div className="text-lg mb-1">🍢</div>
                         <div className="font-bold text-xs text-text-primary group-hover:text-brand-400">Kebab & Grill</div>
@@ -179,7 +179,7 @@ STRICT REQUIREMENT:
 
                     <button
                         onClick={() => applyPreset('chaat')}
-                        className="p-3.5 rounded-2xl bg-[#1a1a1e] hover:bg-[#222228] border border-border-subtle hover:border-brand-500/50 text-left transition-all cursor-pointer group"
+                        className="p-3.5 rounded-2xl bg-bg-surface-inset hover:bg-bg-surface-inset border border-border-subtle hover:border-brand-500/50 text-left transition-all cursor-pointer group"
                     >
                         <div className="text-lg mb-1">🍲</div>
                         <div className="font-bold text-xs text-text-primary group-hover:text-brand-400">Chaat Corner</div>
@@ -188,7 +188,7 @@ STRICT REQUIREMENT:
 
                     <button
                         onClick={() => applyPreset('dosa')}
-                        className="p-3.5 rounded-2xl bg-[#1a1a1e] hover:bg-[#222228] border border-border-subtle hover:border-brand-500/50 text-left transition-all cursor-pointer group"
+                        className="p-3.5 rounded-2xl bg-bg-surface-inset hover:bg-bg-surface-inset border border-border-subtle hover:border-brand-500/50 text-left transition-all cursor-pointer group"
                     >
                         <div className="text-lg mb-1">🫓</div>
                         <div className="font-bold text-xs text-text-primary group-hover:text-brand-400">South Tiffin</div>
@@ -197,7 +197,7 @@ STRICT REQUIREMENT:
 
                     <button
                         onClick={() => applyPreset('kirana')}
-                        className="p-3.5 rounded-2xl bg-[#1a1a1e] hover:bg-[#222228] border border-border-subtle hover:border-brand-500/50 text-left transition-all cursor-pointer group"
+                        className="p-3.5 rounded-2xl bg-bg-surface-inset hover:bg-bg-surface-inset border border-border-subtle hover:border-brand-500/50 text-left transition-all cursor-pointer group"
                     >
                         <div className="text-lg mb-1">🛒</div>
                         <div className="font-bold text-xs text-text-primary group-hover:text-brand-400">Kirana & Grocery</div>
@@ -206,7 +206,7 @@ STRICT REQUIREMENT:
 
                     <button
                         onClick={() => applyPreset('organic')}
-                        className="p-3.5 rounded-2xl bg-[#1a1a1e] hover:bg-[#222228] border border-border-subtle hover:border-brand-500/50 text-left transition-all cursor-pointer group col-span-2 sm:col-span-1"
+                        className="p-3.5 rounded-2xl bg-bg-surface-inset hover:bg-bg-surface-inset border border-border-subtle hover:border-brand-500/50 text-left transition-all cursor-pointer group col-span-2 sm:col-span-1"
                     >
                         <div className="text-lg mb-1">🍎</div>
                         <div className="font-bold text-xs text-text-primary group-hover:text-brand-400">Fruits & Veggies</div>
@@ -219,7 +219,7 @@ STRICT REQUIREMENT:
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* Left Column: Placeholder Configuration Form (7 Cols) */}
                 <div className="lg:col-span-7 space-y-6">
-                    <div className="bg-[#141417] border border-border-subtle rounded-3xl p-6 shadow-lg">
+                    <div className="bg-bg-surface border border-border-subtle rounded-3xl p-6 shadow-lg">
                         <div className="flex items-center justify-between mb-6 pb-4 border-b border-border-subtle">
                             <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
                                 <Sliders className="w-5 h-5 text-brand-500" />
@@ -242,7 +242,7 @@ STRICT REQUIREMENT:
                                         value={config.storeName}
                                         onChange={(e) => handleChange('storeName', e.target.value)}
                                         placeholder="e.g. Preetham's Kabab"
-                                        className="w-full bg-[#1b1b1f] border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
+                                        className="w-full bg-bg-surface-inset border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
                                     />
                                 </div>
 
@@ -255,7 +255,7 @@ STRICT REQUIREMENT:
                                         value={config.location}
                                         onChange={(e) => handleChange('location', e.target.value)}
                                         placeholder="e.g. MG Road Gate 2"
-                                        className="w-full bg-[#1b1b1f] border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
+                                        className="w-full bg-bg-surface-inset border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
                                     />
                                 </div>
                             </div>
@@ -271,7 +271,7 @@ STRICT REQUIREMENT:
                                         value={config.tagline}
                                         onChange={(e) => handleChange('tagline', e.target.value)}
                                         placeholder="e.g. Charcoal Grilled Goodness"
-                                        className="w-full bg-[#1b1b1f] border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
+                                        className="w-full bg-bg-surface-inset border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
                                     />
                                 </div>
 
@@ -284,7 +284,7 @@ STRICT REQUIREMENT:
                                         value={config.signatureDishes}
                                         onChange={(e) => handleChange('signatureDishes', e.target.value)}
                                         placeholder="e.g. Chicken Tikka & Seekh Kabab"
-                                        className="w-full bg-[#1b1b1f] border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
+                                        className="w-full bg-bg-surface-inset border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
                                     />
                                 </div>
                             </div>
@@ -300,7 +300,7 @@ STRICT REQUIREMENT:
                                         value={config.discountCode}
                                         onChange={(e) => handleChange('discountCode', e.target.value)}
                                         placeholder="e.g. KABAB20"
-                                        className="w-full bg-[#1b1b1f] border border-[#2e2e36] rounded-xl p-3 text-xs font-mono font-bold text-brand-400 focus:outline-none focus:border-brand-500"
+                                        className="w-full bg-bg-surface-inset border border-[#2e2e36] rounded-xl p-3 text-xs font-mono font-bold text-brand-400 focus:outline-none focus:border-brand-500"
                                     />
                                 </div>
 
@@ -313,7 +313,7 @@ STRICT REQUIREMENT:
                                         value={config.discountAmount}
                                         onChange={(e) => handleChange('discountAmount', e.target.value)}
                                         placeholder="e.g. 20% OFF or Buy 1 Get 1"
-                                        className="w-full bg-[#1b1b1f] border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
+                                        className="w-full bg-bg-surface-inset border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
                                     />
                                 </div>
                             </div>
@@ -329,7 +329,7 @@ STRICT REQUIREMENT:
                                         value={config.whatsappNumber}
                                         onChange={(e) => handleChange('whatsappNumber', e.target.value)}
                                         placeholder="e.g. +91 9900112233"
-                                        className="w-full bg-[#1b1b1f] border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
+                                        className="w-full bg-bg-surface-inset border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
                                     />
                                 </div>
 
@@ -342,7 +342,7 @@ STRICT REQUIREMENT:
                                         value={config.orderLink}
                                         onChange={(e) => handleChange('orderLink', e.target.value)}
                                         placeholder="e.g. https://streetvend.ai/cart"
-                                        className="w-full bg-[#1b1b1f] border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
+                                        className="w-full bg-bg-surface-inset border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
                                     />
                                 </div>
                             </div>
@@ -358,7 +358,7 @@ STRICT REQUIREMENT:
                                         value={config.audienceGreeting}
                                         onChange={(e) => handleChange('audienceGreeting', e.target.value)}
                                         placeholder="e.g. Hey Kebab Lover"
-                                        className="w-full bg-[#1b1b1f] border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
+                                        className="w-full bg-bg-surface-inset border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
                                     />
                                 </div>
 
@@ -371,7 +371,7 @@ STRICT REQUIREMENT:
                                         value={config.callToAction}
                                         onChange={(e) => handleChange('callToAction', e.target.value)}
                                         placeholder="e.g. Show message at counter for instant discount!"
-                                        className="w-full bg-[#1b1b1f] border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
+                                        className="w-full bg-bg-surface-inset border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
                                     />
                                 </div>
                             </div>
@@ -386,14 +386,14 @@ STRICT REQUIREMENT:
                                     value={config.customNote}
                                     onChange={(e) => handleChange('customNote', e.target.value)}
                                     placeholder="e.g. Valid today only. Freshly prepared on order!"
-                                    className="w-full bg-[#1b1b1f] border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
+                                    className="w-full bg-bg-surface-inset border border-[#2e2e36] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
                                 />
                             </div>
                         </div>
                     </div>
 
                     {/* Interactive Placeholder Token Reference Box */}
-                    <div className="bg-[#141417] border border-border-subtle rounded-3xl p-6 shadow-lg">
+                    <div className="bg-bg-surface border border-border-subtle rounded-3xl p-6 shadow-lg">
                         <h3 className="text-xs font-extrabold uppercase tracking-widest text-text-tertiary mb-3 flex items-center gap-2">
                             <HelpCircle className="w-4 h-4 text-brand-500" />
                             <span>Available Placeholder Variables (Click to Copy)</span>
@@ -406,7 +406,7 @@ STRICT REQUIREMENT:
                                 <button
                                     key={t.code}
                                     onClick={() => handleCopyToken(t.code)}
-                                    className="px-2.5 py-1.5 rounded-xl bg-[#1d1d23] hover:bg-brand-500/20 border border-[#2d2d38] hover:border-brand-500/50 text-xs font-mono font-bold text-brand-400 flex items-center gap-1.5 transition-all cursor-pointer"
+                                    className="px-2.5 py-1.5 rounded-xl bg-bg-surface-inset hover:bg-brand-500/20 border border-border-subtle hover:border-brand-500/50 text-xs font-mono font-bold text-brand-400 flex items-center gap-1.5 transition-all cursor-pointer"
                                     title={`Copy ${t.code} (${t.val})`}
                                 >
                                     <span>{t.code}</span>
@@ -423,13 +423,13 @@ STRICT REQUIREMENT:
 
                 {/* Right Column: Realtime WhatsApp Live Preview (5 Cols) */}
                 <div className="lg:col-span-5 space-y-6">
-                    <div className="bg-[#141417] border border-border-subtle rounded-3xl p-6 shadow-lg sticky top-24">
+                    <div className="bg-bg-surface border border-border-subtle rounded-3xl p-6 shadow-lg sticky top-24">
                         <div className="flex items-center justify-between mb-4 pb-3 border-b border-border-subtle">
                             <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-emerald-400">
                                 <MessageCircle className="w-4 h-4 text-emerald-400" />
                                 <span>WhatsApp Live Preview</span>
                             </div>
-                            <span className="text-[10px] font-bold text-text-tertiary bg-[#1c1c22] px-2 py-0.5 rounded-md">
+                            <span className="text-[10px] font-bold text-text-tertiary bg-bg-surface-inset px-2 py-0.5 rounded-md">
                                 {config.storeName}
                             </span>
                         </div>
@@ -495,7 +495,7 @@ STRICT REQUIREMENT:
                             </button>
 
                             {generatedText && (
-                                <div className="mt-4 p-4 rounded-2xl bg-[#1a1a20] border border-[#2d2d38] text-xs space-y-2">
+                                <div className="mt-4 p-4 rounded-2xl bg-bg-surface-inset border border-border-subtle text-xs space-y-2">
                                     <div className="flex items-center justify-between text-brand-400 font-bold text-[11px]">
                                         <span className="flex items-center gap-1">
                                             <Wand2 className="w-3.5 h-3.5" /> AI Generated Result

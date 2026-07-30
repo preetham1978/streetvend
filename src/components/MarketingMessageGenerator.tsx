@@ -209,8 +209,8 @@ STRICT STORE-CENTRIC REQUIREMENTS:
     };
 
     return (
-        <div className="bg-[#141416] border border-[#28282e] rounded-3xl p-6 sm:p-8 shadow-2xl relative">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-[#28282e]">
+        <div className="bg-bg-surface border border-border-subtle rounded-3xl p-6 sm:p-8 shadow-2xl relative">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-border-subtle">
                 <div>
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-500/10 text-brand-500 text-[10px] font-extrabold uppercase tracking-widest border border-brand-500/20 mb-2">
                         <Sparkles className="w-3.5 h-3.5" />
@@ -232,9 +232,9 @@ STRICT STORE-CENTRIC REQUIREMENTS:
                 <div className="flex items-center gap-2">
                     <Link
                         to="/ai-marketing"
-                        className="px-4 py-2 rounded-xl bg-[#222228] hover:bg-[#2c2c34] text-brand-400 font-bold text-xs flex items-center gap-1.5 border border-brand-500/30 transition-all shadow-sm"
+                        className="px-4 py-2 rounded-xl bg-bg-surface-inset hover:bg-bg-surface text-brand-500 font-bold text-xs flex items-center gap-1.5 border border-brand-500/30 transition-all shadow-sm"
                     >
-                        <Sliders className="w-3.5 h-3.5 text-brand-400" />
+                        <Sliders className="w-3.5 h-3.5 text-brand-500" />
                         <span>Configure AI Placeholders</span>
                     </Link>
                 </div>
@@ -262,7 +262,7 @@ STRICT STORE-CENTRIC REQUIREMENTS:
                             setSegment(e.target.value);
                             handleControlChange(e.target.value, undefined, undefined);
                         }}
-                        className="w-full bg-[#1b1b1e] border border-[#2d2d34] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
+                        className="w-full bg-bg-surface-inset border border-border-subtle rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
                     >
                         <option value="regular">Regular VIP Foodies (180+ customers)</option>
                         <option value="weekend">Weekend Snackers (95+ customers)</option>
@@ -281,7 +281,7 @@ STRICT STORE-CENTRIC REQUIREMENTS:
                             setOffer(e.target.value);
                             handleControlChange(undefined, e.target.value, undefined);
                         }}
-                        className="w-full bg-[#1b1b1e] border border-[#2d2d34] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
+                        className="w-full bg-bg-surface-inset border border-border-subtle rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
                     >
                         <option value="combo">Combo Deal Special (20% Off)</option>
                         <option value="bogo">Buy 2 Get 1 Free</option>
@@ -302,7 +302,7 @@ STRICT STORE-CENTRIC REQUIREMENTS:
                             handleControlChange(undefined, undefined, e.target.value);
                         }}
                         placeholder="e.g. Chicken Tikka & Seekh Kabab"
-                        className="w-full bg-[#1b1b1e] border border-[#2d2d34] rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
+                        className="w-full bg-bg-surface-inset border border-border-subtle rounded-xl p-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand-500"
                     />
                 </div>
             </div>
@@ -319,7 +319,7 @@ STRICT STORE-CENTRIC REQUIREMENTS:
             </div>
 
             {/* Message Preview Box */}
-            <div className="bg-[#18181c] border border-[#2d2d32] rounded-2xl p-5 mb-6 relative">
+            <div className="bg-bg-surface-inset border border-border-subtle rounded-2xl p-5 mb-6 relative">
                 <div className="flex items-center justify-between mb-3 text-xs text-text-tertiary">
                     <span className="font-bold uppercase tracking-widest flex items-center gap-1.5 text-accent-green">
                         <MessageCircle className="w-4 h-4 text-accent-green" /> WhatsApp Campaign Copy ({activeStoreName})
@@ -330,14 +330,14 @@ STRICT STORE-CENTRIC REQUIREMENTS:
                             setCopied(true);
                             setTimeout(() => setCopied(false), 2000);
                         }}
-                        className="px-3 py-1 rounded-lg bg-[#222226] text-text-secondary hover:text-white font-bold flex items-center gap-1 transition-all cursor-pointer"
+                        className="px-3 py-1 rounded-lg bg-bg-surface text-text-secondary hover:text-text-primary font-bold flex items-center gap-1 transition-all cursor-pointer"
                     >
                         {copied ? <Check className="w-3.5 h-3.5 text-accent-green" /> : <Copy className="w-3.5 h-3.5" />}
                         <span>{copied ? 'Copied' : 'Copy'}</span>
                     </button>
                 </div>
 
-                <div className="bg-[#121214] p-4 rounded-xl border border-[#25252a] text-xs leading-relaxed text-text-primary whitespace-pre-wrap font-sans">
+                <div className="bg-bg-base p-4 rounded-xl border border-border-subtle text-xs leading-relaxed text-text-primary whitespace-pre-wrap font-sans">
                     {generatedText}
                 </div>
             </div>

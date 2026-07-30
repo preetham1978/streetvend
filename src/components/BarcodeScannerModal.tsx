@@ -102,13 +102,13 @@ export default function BarcodeScannerModal({
                     animate={{ y: 0 }}
                     exit={{ y: '100%' }}
                     transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-                    className="bg-[#141416] border border-[#28282e] rounded-t-[2.5rem] sm:rounded-[2.5rem] w-full max-w-md shadow-2xl relative overflow-hidden flex flex-col h-[85vh] sm:h-auto"
+                    className="bg-bg-surface border border-border-subtle rounded-t-[2.5rem] sm:rounded-[2.5rem] w-full max-w-md shadow-2xl relative overflow-hidden flex flex-col h-[85vh] sm:h-auto"
                 >
-                    <div className="w-12 h-1 bg-[#28282e] rounded-full mx-auto mt-4 mb-2 sm:hidden shrink-0" />
+                    <div className="w-12 h-1 bg-border-subtle rounded-full mx-auto mt-4 mb-2 sm:hidden shrink-0" />
                     
                     <button
                         onClick={onClose}
-                        className="absolute top-6 right-6 p-2.5 rounded-full text-text-tertiary hover:text-text-primary hover:bg-[#222228] transition-all cursor-pointer z-20"
+                        className="absolute top-6 right-6 p-2.5 rounded-full text-text-tertiary hover:text-text-primary hover:bg-bg-surface-inset transition-all cursor-pointer z-20"
                     >
                         <X className="w-6 h-6" />
                     </button>
@@ -122,7 +122,7 @@ export default function BarcodeScannerModal({
                         <h2 className="text-xl font-display font-extrabold text-white mb-1 uppercase tracking-tight">{title}</h2>
                         <p className="text-[10px] text-text-tertiary uppercase tracking-widest mb-6">Google Lens style OCR & recognition</p>
 
-                        <div className="relative mx-auto w-full aspect-square rounded-[2rem] overflow-hidden border-4 border-[#28282e] shadow-2xl mb-8">
+                        <div className="relative mx-auto w-full aspect-square rounded-[2rem] overflow-hidden border-4 border-border-subtle shadow-2xl mb-8">
                             <WebcamComponent
                                 audio={false}
                                 ref={webcamRef}
@@ -188,7 +188,7 @@ export default function BarcodeScannerModal({
                                             onClick={() => setAutoScan(!autoScan)}
                                             className={cn(
                                                 "flex items-center gap-2 px-4 py-2 rounded-full border transition-all text-[10px] font-bold uppercase tracking-widest",
-                                                autoScan ? "bg-brand-500 border-brand-500 text-white shadow-lg shadow-brand-500/30" : "bg-transparent border-[#28282e] text-text-tertiary"
+                                                autoScan ? "bg-brand-500 border-brand-500 text-white shadow-lg shadow-brand-500/30" : "bg-transparent border-border-subtle text-text-tertiary"
                                             )}
                                         >
                                             <Zap className="w-3.5 h-3.5" />
@@ -214,7 +214,7 @@ export default function BarcodeScannerModal({
                     <div className="p-8 pt-0">
                         <button
                             onClick={onClose}
-                            className="w-full py-4 rounded-2xl bg-[#1c1c21] text-text-secondary font-bold text-xs uppercase tracking-widest hover:text-white transition-all border border-[#28282e]"
+                            className="w-full py-4 rounded-2xl bg-bg-surface-inset text-text-secondary font-bold text-xs uppercase tracking-widest hover:text-white transition-all border border-border-subtle"
                         >
                             Cancel
                         </button>

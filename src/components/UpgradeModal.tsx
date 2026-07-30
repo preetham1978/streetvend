@@ -30,12 +30,12 @@ export default function UpgradeModal({
 
     return (
         <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in overflow-hidden">
-            <div className="bg-[#141416] border border-[#28282e] rounded-t-3xl sm:rounded-3xl p-6 sm:p-8 w-full max-w-2xl shadow-2xl relative my-0 sm:my-8 mt-auto sm:mt-auto max-h-[92vh] overflow-y-auto overflow-x-hidden scrollbar-hide pb-10 sm:pb-8">
-                <div className="w-12 h-1 bg-[#28282e] rounded-full mx-auto mb-6 sm:hidden shrink-0" />
+            <div className="bg-bg-surface border border-border-subtle rounded-t-3xl sm:rounded-3xl p-6 sm:p-8 w-full max-w-2xl shadow-2xl relative my-0 sm:my-8 mt-auto sm:mt-auto max-h-[92vh] overflow-y-auto overflow-x-hidden scrollbar-hide pb-10 sm:pb-8">
+                <div className="w-12 h-1 bg-border-subtle rounded-full mx-auto mb-6 sm:hidden shrink-0" />
                 {/* Close Button */}
                 <button
                     onClick={onClose}
-                    className="absolute top-5 right-5 p-2 rounded-full text-text-tertiary hover:text-text-primary hover:bg-[#222228] transition-all cursor-pointer"
+                    className="absolute top-5 right-5 p-2 rounded-full text-text-tertiary hover:text-text-primary hover:bg-bg-surface-inset transition-all cursor-pointer"
                 >
                     <X className="w-5 h-5" />
                 </button>
@@ -103,7 +103,7 @@ export default function UpgradeModal({
                                             ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
                                             : isTarget
                                             ? 'bg-brand-500 text-white hover:bg-brand-600 shadow-md'
-                                            : 'bg-[#26262b] text-text-primary hover:bg-[#303037]'
+                                            : 'bg-bg-surface-inset text-text-primary hover:bg-bg-base'
                                     }`}
                                 >
                                     {isCurrent ? 'Active Plan' : `Switch to ${cfg.name.split(' ')[0]}`}
@@ -114,7 +114,7 @@ export default function UpgradeModal({
                 </div>
 
                 {/* Footer Note */}
-                <div className="flex items-center justify-between pt-4 border-t border-[#28282e] text-xs text-text-tertiary">
+                <div className="flex items-center justify-between pt-4 border-t border-border-subtle text-xs text-text-tertiary">
                     <span className="flex items-center gap-1.5">
                         <ShieldCheck className="w-4 h-4 text-accent-green" /> Immediate activation via Streetvend
                     </span>

@@ -231,15 +231,17 @@ async function startServer() {
           const { error: paymentError } = await supabaseAdmin
             .from('subscription_payments')
             .insert([{
+              id: txnid,
               vendor_id: vendorId,
-              txnid: txnid,
               gateway_ref: mihpayid,
               amount: parseFloat(amount),
               tier: planId,
               plan_name: planId === 'professional' ? 'Professional' : (planId.charAt(0).toUpperCase() + planId.slice(1)),
               status: 'success',
-              raw_response: JSON.stringify(payuResponse),
-              created_at: new Date().toISOString()
+              method: payuResponse.mode || 'PayU',
+              payer_detail: JSON.stringify(payuResponse),
+              created_at: new Date().toISOString(),
+              paid_at: new Date().toISOString()
             }]);
 
           if (paymentError) {
@@ -360,7 +362,7 @@ async function startServer() {
       const { data: existingPayment } = await supabaseAdmin
         .from('subscription_payments')
         .select('id')
-        .eq('txnid', txnid)
+        .eq('id', txnid)
         .single();
 
       if (existingPayment) {

@@ -81,8 +81,8 @@ export default function AutoReorderSection({ products = [] }: AutoReorderSection
     };
 
     return (
-        <div className="bg-[#141416] border border-[#28282e] rounded-3xl p-6 sm:p-8 shadow-2xl relative">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-[#28282e]">
+        <div className="bg-bg-surface border border-border-subtle rounded-3xl p-6 sm:p-8 shadow-2xl relative">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-border-subtle">
                 <div>
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-500/10 text-brand-500 text-[10px] font-extrabold uppercase tracking-widest border border-brand-500/20 mb-2">
                         <Sparkles className="w-3.5 h-3.5" />
@@ -115,7 +115,7 @@ export default function AutoReorderSection({ products = [] }: AutoReorderSection
                     return (
                         <div
                             key={po.id}
-                            className="bg-[#1a1a1e] border border-[#2d2d34] rounded-2xl p-5 flex flex-col justify-between hover:border-brand-500/40 transition-all"
+                            className="bg-bg-surface-inset border border-border-subtle rounded-2xl p-5 flex flex-col justify-between hover:border-brand-500/40 transition-all"
                         >
                             <div>
                                 <div className="flex items-center justify-between mb-3">
@@ -131,7 +131,7 @@ export default function AutoReorderSection({ products = [] }: AutoReorderSection
                                     <span>{po.supplierName}</span>
                                 </p>
 
-                                <div className="bg-[#121214] p-3 rounded-xl border border-[#25252a] space-y-1 mb-4 text-xs">
+                                <div className="bg-bg-base p-3 rounded-xl border border-border-subtle space-y-1 mb-4 text-xs">
                                     <div className="flex justify-between text-text-secondary">
                                         <span>Suggested Reorder:</span>
                                         <strong className="text-white">{po.suggestedQty} Units</strong>

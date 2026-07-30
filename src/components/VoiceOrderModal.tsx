@@ -148,14 +148,14 @@ export default function VoiceOrderModal({
                         animate={{ y: 0 }}
                         exit={{ y: '100%' }}
                         transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-                        className="bg-[#141416] border border-[#28282e] rounded-t-3xl sm:rounded-3xl p-6 sm:p-8 w-full max-w-md shadow-2xl relative text-center max-h-[95vh] overflow-y-auto overflow-x-hidden scrollbar-hide flex flex-col"
+                        className="bg-bg-surface border border-border-subtle rounded-t-3xl sm:rounded-3xl p-6 sm:p-8 w-full max-w-md shadow-2xl relative text-center max-h-[95vh] overflow-y-auto overflow-x-hidden scrollbar-hide flex flex-col"
                     >
-                        <div className="w-12 h-1.5 bg-[#28282e] rounded-full mx-auto mb-6 sm:hidden shrink-0" />
+                        <div className="w-12 h-1.5 bg-border-subtle rounded-full mx-auto mb-6 sm:hidden shrink-0" />
                         
                         <div className="flex-1">
                             <button
                                 onClick={onClose}
-                                className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2 rounded-full text-text-tertiary hover:text-text-primary hover:bg-[#222228] transition-all cursor-pointer z-10"
+                                className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2 rounded-full text-text-tertiary hover:text-text-primary hover:bg-bg-surface-inset transition-all cursor-pointer z-10"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -190,7 +190,7 @@ export default function VoiceOrderModal({
                             </div>
 
                             {/* Status / Transcript Box */}
-                            <div className="bg-[#18181c] p-4 rounded-2xl border border-[#28282e] mb-4 min-h-[80px] flex flex-col justify-center items-center">
+                            <div className="bg-bg-surface-inset p-4 rounded-2xl border border-border-subtle mb-4 min-h-[80px] flex flex-col justify-center items-center">
                                 {isGlobalProcessing ? (
                                     <div className="flex flex-col items-center gap-2">
                                         <RefreshCw className="w-6 h-6 text-brand-500 animate-spin" />
@@ -226,7 +226,7 @@ export default function VoiceOrderModal({
                                         name="manualText"
                                         type="text"
                                         placeholder="Or type order (e.g. 2 Dosa)..."
-                                        className="flex-1 px-3.5 py-3 rounded-xl bg-[#18181c] border border-[#28282e] text-xs text-text-primary focus:outline-none focus:border-brand-500"
+                                        className="flex-1 px-3.5 py-3 rounded-xl bg-bg-surface-inset border border-border-subtle text-xs text-text-primary focus:outline-none focus:border-brand-500"
                                     />
                                     <button
                                         type="submit"
@@ -240,7 +240,7 @@ export default function VoiceOrderModal({
 
                             {/* Parsed Items Preview */}
                             {parsedItems.length > 0 && (
-                                <div className="bg-[#1b1b1f] p-4 rounded-2xl border border-[#2d2d34] mb-6 text-left">
+                                <div className="bg-bg-surface-inset p-4 rounded-2xl border border-border-subtle mb-6 text-left">
                                     <span className="text-[10px] font-extrabold uppercase tracking-widest text-text-tertiary block mb-2">
                                         Extracted Items:
                                     </span>
@@ -268,7 +268,7 @@ export default function VoiceOrderModal({
                             </button>
                             <button
                                 onClick={onClose}
-                                className="w-full py-3 rounded-2xl bg-[#222226] text-text-secondary font-bold text-xs hover:text-text-primary transition-all cursor-pointer"
+                                className="w-full py-3 rounded-2xl bg-bg-surface-inset text-text-secondary font-bold text-xs hover:text-text-primary transition-all cursor-pointer"
                             >
                                 Cancel
                             </button>
