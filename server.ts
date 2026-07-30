@@ -522,6 +522,88 @@ async function startServer() {
       }
   });
 
+  app.post("/api/register-vendor", async (req, res) => {
+      try {
+          const vendorData = req.body;
+          if (!vendorData || !vendorData.user_id) {
+              return res.status(400).json({ error: "Missing vendor data or user_id" });
+          }
+
+          const supabaseAdmin = getSupabaseAdmin();
+          if (!supabaseAdmin) {
+              return res.status(500).json({ error: "Database connection unavailable" });
+          }
+
+          // Clean phone number: use null if empty to avoid unique constraint on empty strings
+          if (!vendorData.phone || typeof vendorData.phone !== 'string' || !vendorData.phone.trim()) {
+              vendorData.phone = null;
+          } else {
+              vendorData.phone = vendorData.phone.trim();
+          }
+
+          // Check if a vendor already exists for this user_id or email
+          const { data: existingVendor } = await supabaseAdmin
+              .from('vendors')
+              .select('*')
+              .or(`user_id.eq.${vendorData.user_id},email.eq.${vendorData.email}`)
+              .maybeSingle();
+
+          let resultData;
+          if (existingVendor) {
+              // Update existing vendor record
+              const updatePayload: any = {
+                  name: vendorData.name,
+                  owner_name: vendorData.owner_name,
+                  phone: vendorData.phone,
+                  email: vendorData.email,
+                  category: vendorData.category,
+                  address: vendorData.address,
+                  subscription: vendorData.subscription,
+                  is_active: true
+              };
+              // Only update user_id if not present
+              if (!existingVendor.user_id) {
+                  updatePayload.user_id = vendorData.user_id;
+              }
+
+              const { data, error } = await supabaseAdmin
+                  .from('vendors')
+                  .update(updatePayload)
+                  .eq('id', existingVendor.id)
+                  .select();
+
+              if (error) {
+                  console.error("Error updating existing vendor:", error);
+                  if (error.message?.includes('vendors_phone_key') || error.message?.includes('unique constraint')) {
+                      return res.status(400).json({ error: "This phone number is already registered to another store. Please use a different phone number." });
+                  }
+                  return res.status(500).json({ error: error.message });
+              }
+              resultData = data?.[0];
+          } else {
+              // Insert new vendor
+              const { data, error } = await supabaseAdmin
+                  .from('vendors')
+                  .insert([vendorData])
+                  .select();
+
+              if (error) {
+                  console.error("Error inserting vendor via admin:", error);
+                  if (error.message?.includes('vendors_phone_key') || error.message?.includes('unique constraint')) {
+                      return res.status(400).json({ error: "This phone number is already registered to another store. Please use a different phone number." });
+                  }
+                  return res.status(500).json({ error: error.message });
+              }
+              resultData = data?.[0];
+          }
+
+          res.json({ success: true, vendor: resultData });
+      } catch (err: any) {
+          console.error("Register vendor endpoint error:", err);
+          res.status(500).json({ error: err.message || "Failed to register vendor" });
+      }
+  });
+
   app.post("/api/vendor/apply-downgrade", async (req, res) => {
       try {
           const { vendorId, targetPlan, currentPlan } = req.body;

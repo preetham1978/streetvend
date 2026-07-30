@@ -82,7 +82,7 @@ export default function StorePage() {
                 }
             }
 
-            if (storeProducts.length === 0) {
+            if (storeProducts.length === 0 && !supabase) {
                 storeProducts = mockDb.products.filter(p => p.vendorId === vendorId) as Product[];
             }
 

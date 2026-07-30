@@ -297,7 +297,7 @@ export default function ProductsPage() {
                 }
 
                 if (editingProduct) {
-                    const { error } = await (supabase.from('products') as any).update({
+                    const updatePayload: any = {
                         name: name.trim(),
                         price: parseFloat(price),
                         unit,
@@ -307,12 +307,20 @@ export default function ProductsPage() {
                         type,
                         in_stock: type === 'service' || (parseInt(stock) || 0) > 0,
                         updated_at: new Date().toISOString()
-                    }).eq('id', editingProduct.id);
+                    };
+
+                    let { error } = await (supabase.from('products') as any).update(updatePayload).eq('id', editingProduct.id);
+
+                    if (error && (error.message?.includes('type') || error.message?.includes('schema cache'))) {
+                        delete updatePayload.type;
+                        const res = await (supabase.from('products') as any).update(updatePayload).eq('id', editingProduct.id);
+                        error = res.error;
+                    }
 
                     if (error) throw error;
                 } else {
                     const newId = 'p_' + Math.random().toString(36).substring(2, 9);
-                    const { error } = await (supabase.from('products') as any).insert({
+                    const insertPayload: any = {
                         id: newId,
                         vendor_id: vendorId,
                         name: name.trim(),
@@ -324,7 +332,15 @@ export default function ProductsPage() {
                         type,
                         in_stock: true,
                         updated_at: new Date().toISOString()
-                    });
+                    };
+
+                    let { error } = await (supabase.from('products') as any).insert(insertPayload);
+
+                    if (error && (error.message?.includes('type') || error.message?.includes('schema cache'))) {
+                        delete insertPayload.type;
+                        const res = await (supabase.from('products') as any).insert(insertPayload);
+                        error = res.error;
+                    }
 
                     if (error) throw error;
                 }

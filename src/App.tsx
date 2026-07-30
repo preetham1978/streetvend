@@ -33,7 +33,7 @@ function ScrollToTop() {
 }
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user, session, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -44,6 +44,9 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
+    if (session) {
+      return <Navigate to="/register" replace />;
+    }
     return <Navigate to="/login" replace />;
   }
 

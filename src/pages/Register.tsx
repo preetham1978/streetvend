@@ -18,7 +18,7 @@ export default function Register() {
     const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
     
     const navigate = useNavigate();
-    const { loginWithEmail, verifyOtp } = useAuth();
+    const { loginWithEmail, verifyOtp, session, updateUser, refreshProfile } = useAuth();
     
     // Form State
     const [storeName, setStoreName] = useState('');
@@ -30,6 +30,12 @@ export default function Register() {
     const [city, setCity] = useState('');
     const [plan, setPlan] = useState('free');
 
+    React.useEffect(() => {
+        if (session?.user?.email && !email) {
+            setEmail(session.user.email);
+        }
+    }, [session]);
+
     const categories = [
         'Street Food', 'Vegetables & Fruits', 'Meat & Seafood', 'Groceries', 
         'Laundry', 'Key Maker', 'Mobile Accessories', 'Watch Repair\'s', 
@@ -37,6 +43,47 @@ export default function Register() {
     ];
 
     const plans = Object.values(PLANS_CONFIG);
+
+    const createVendorRecord = async (userId: string) => {
+        const cleanPhone = phone && phone.trim() ? phone.trim() : null;
+        const newVendorDb = {
+            id: 'v_' + Math.random().toString(36).substring(2, 9),
+            user_id: userId,
+            name: storeName || 'My Street Store',
+            owner_name: ownerName || 'Vendor',
+            phone: cleanPhone,
+            email: email || session?.user?.email,
+            category: category || 'Street Food',
+            address: `${address || ''}${address && city ? ', ' : ''}${city || ''}`,
+            subscription: plan || 'free',
+            is_active: true,
+            created_at: new Date().toISOString()
+        };
+
+        const res = await fetch('/api/register-vendor', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newVendorDb)
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            let errMsg = errData.error || 'Registration failed';
+            if (errMsg.includes('vendors_phone_key') || errMsg.includes('unique constraint')) {
+                errMsg = 'This phone number is already registered to another store. Please use a different phone number.';
+            }
+            throw new Error(errMsg);
+        }
+
+        const resJson = await res.json();
+        const savedVendor = resJson.vendor || newVendorDb;
+
+        const vendorObj = mapVendorFromDb(savedVendor);
+        updateUser(vendorObj);
+        localStorage.setItem('vendor_user', JSON.stringify(vendorObj));
+        await refreshProfile();
+        navigate('/dashboard');
+    };
 
     const handleStartRegistration = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -49,6 +96,11 @@ export default function Register() {
 
         setIsSubmitting(true);
         try {
+            if (session?.user) {
+                // Auth session already created (e.g. verified OTP on login or previously)
+                await createVendorRecord(session.user.id);
+                return;
+            }
             await loginWithEmail(email);
             setIsVerifying(true);
         } catch (err: any) {
@@ -78,29 +130,8 @@ export default function Register() {
 
             if (verifyError || !data?.user) throw verifyError || new Error("Verification failed");
 
-            const authUser = data.user;
-
-            // 2. Create Vendor Row
-            const newVendorDb = {
-                id: 'v_' + Math.random().toString(36).substring(2, 9),
-                user_id: authUser.id,
-                name: storeName,
-                owner_name: ownerName,
-                phone,
-                email: email,
-                category,
-                address: `${address}, ${city}`,
-                subscription: plan,
-                is_active: true,
-                created_at: new Date().toISOString()
-            };
-
-            if (supabase) {
-                const { error } = await (supabase.from('vendors') as any).insert([newVendorDb]);
-                if (error) throw error;
-            }
-
-            navigate('/dashboard');
+            // 2. Create Vendor Row with user_id = data.user.id and all collected form data
+            await createVendorRecord(data.user.id);
         } catch (err: any) {
             setErrorMsg(err?.message || 'Verification or registration failed');
         } finally {

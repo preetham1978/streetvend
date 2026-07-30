@@ -10,15 +10,6 @@ import { usePlanLimits } from '../hooks/usePlanLimits';
 import VoiceOrderModal from '../components/VoiceOrderModal';
 import UpgradeModal from '../components/UpgradeModal';
 
-const DEFAULT_PRODUCTS: Product[] = [
-    { id: 'p1', name: 'Pani Puri', category: 'SNACKS', price: 40, stock: 100, unit: 'plate', vendorId: 'v1' },
-    { id: 'p2', name: 'Bhel Puri', category: 'SNACKS', price: 50, stock: 100, unit: 'plate', vendorId: 'v1' },
-    { id: 'p3', name: 'Aloo Tikki', category: 'SNACKS', price: 60, stock: 100, unit: 'plate', vendorId: 'v1' },
-    { id: 'p4', name: 'Samosa', category: 'SNACKS', price: 20, stock: 100, unit: 'piece', vendorId: 'v1' },
-    { id: 'p5', name: 'Dahi Puri', category: 'SNACKS', price: 55, stock: 100, unit: 'plate', vendorId: 'v1' },
-    { id: 'p6', name: 'Sev Puri', category: 'SNACKS', price: 45, stock: 100, unit: 'plate', vendorId: 'v1' }
-];
-
 export default function CartPage() {
     const { user, isLoading: isAuthLoading } = useAuth();
     const navigate = useNavigate();
@@ -40,7 +31,7 @@ export default function CartPage() {
     const [showVoiceModal, setShowVoiceModal] = useState(false);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-    const activeProducts = products.length > 0 ? products : DEFAULT_PRODUCTS;
+    const activeProducts = products;
 
     // Voice recognition hook (Boli Mode)
     const { isListening, isProcessing: isVoiceProcessing, transcript, startListening, stopListening } = useVoiceOrder({
@@ -65,26 +56,27 @@ export default function CartPage() {
     async function fetchProducts() {
         setIsLoading(true);
         try {
-            const vendorId = user?.id || 'v1';
-            if (supabase) {
+            const vendorId = user?.id;
+            if (supabase && vendorId) {
                 const { data, error } = await supabase
                     .from('products')
                     .select('*')
                     .eq('vendor_id', vendorId);
 
-                if (!error && data && data.length > 0) {
+                if (!error && data) {
                     setProducts(data.map(mapProductFromDb));
                 } else {
-                    const vendorProds = mockDb.products.filter(p => p.vendorId === vendorId);
-                    setProducts(vendorProds.length > 0 ? (vendorProds as Product[]) : DEFAULT_PRODUCTS);
+                    setProducts([]);
                 }
-            } else {
+            } else if (vendorId) {
                 const vendorProds = mockDb.products.filter(p => p.vendorId === vendorId);
-                setProducts(vendorProds.length > 0 ? (vendorProds as Product[]) : DEFAULT_PRODUCTS);
+                setProducts(vendorProds as Product[]);
+            } else {
+                setProducts([]);
             }
         } catch (err) {
             console.error('Exception fetching products:', err);
-            setProducts(DEFAULT_PRODUCTS);
+            setProducts([]);
         } finally {
             setIsLoading(false);
         }
@@ -421,6 +413,26 @@ export default function CartPage() {
                                 <div className="flex flex-col items-center justify-center py-20 bg-bg-surface rounded-2xl border border-border-subtle">
                                     <Loader2 className="w-8 h-8 text-brand-500 animate-spin mb-3" />
                                     <p className="text-xs font-bold text-text-tertiary uppercase tracking-widest">Loading catalog...</p>
+                                </div>
+                            ) : activeProducts.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-16 px-6 bg-bg-surface rounded-2xl border border-border-subtle text-center">
+                                    <div className="w-14 h-14 rounded-2xl bg-brand-500/10 flex items-center justify-center text-brand-500 text-2xl mb-4">
+                                        📦
+                                    </div>
+                                    <h3 className="font-bold text-lg text-text-primary mb-1">No products in your store catalog yet</h3>
+                                    <p className="text-xs text-text-tertiary max-w-sm mb-6 leading-relaxed">
+                                        Add items to your store catalog to start creating quick bills and taking voice orders.
+                                    </p>
+                                    <button
+                                        onClick={() => navigate('/products')}
+                                        className="bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs uppercase tracking-wider px-5 py-3 rounded-xl shadow-lg shadow-brand-500/20 active:scale-95 transition-all flex items-center gap-2"
+                                    >
+                                        <Plus className="w-4 h-4" /> Add Products Now
+                                    </button>
+                                </div>
+                            ) : filteredProducts.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-12 bg-bg-surface rounded-2xl border border-border-subtle text-center">
+                                    <p className="text-sm font-semibold text-text-secondary">No products match your search query or filter.</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-4">

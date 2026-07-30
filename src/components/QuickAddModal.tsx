@@ -91,7 +91,12 @@ export default function QuickAddModal({ isOpen, onClose, vendor, templateKey, on
                     updated_at: new Date().toISOString()
                 }));
 
-                const { error } = await (supabase.from('products') as any).insert(productsToInsert);
+                let { error } = await (supabase.from('products') as any).insert(productsToInsert);
+                if (error && (error.message?.includes('type') || error.message?.includes('schema cache'))) {
+                    const sanitized = productsToInsert.map(({ type, ...rest }) => rest);
+                    const res = await (supabase.from('products') as any).insert(sanitized);
+                    error = res.error;
+                }
                 if (error) throw error;
             } else {
                 // Mock fallback is not really needed as we check for supabase, 

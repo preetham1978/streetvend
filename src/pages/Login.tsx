@@ -81,7 +81,11 @@ export default function Login() {
         } catch (err: any) {
             console.error('OTP Verify Error:', err);
             const message = err?.message || err?.error_description || (typeof err === 'string' ? err : JSON.stringify(err));
-            setErrorMsg(message === '{}' ? 'Verification failed. Please try again.' : message);
+            if (message.includes('Vendor profile not found') || message.includes('register')) {
+                navigate('/register');
+            } else {
+                setErrorMsg(message === '{}' ? 'Verification failed. Please try again.' : message);
+            }
         } finally {
             setIsSubmitting(false);
         }
