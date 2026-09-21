@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/auth';
 import { supabase, mapProductFromDb, mockDb } from '../lib/supabase';
@@ -106,7 +107,7 @@ export default function AiInsightsPage() {
                 console.warn('Supabase query error, using fallback products:', dbErr);
             }
 
-            if (prods.length === 0) {
+            if (prods.length === 0 && import.meta.env.DEV) {
                 prods = mockDb.products.map(p => ({
                     id: p.id,
                     vendorId: p.vendorId,
@@ -122,24 +123,33 @@ export default function AiInsightsPage() {
             await runAiInsights(prods);
         } catch (err) {
             console.error('Error fetching products:', err);
-            const fallbackProds = mockDb.products;
+            const fallbackProds = import.meta.env.DEV ? mockDb.products : [];
             setProducts(fallbackProds);
-            await runAiInsights(fallbackProds);
+            if (fallbackProds.length > 0) {
+                await runAiInsights(fallbackProds);
+            }
         } finally {
             setIsLoading(false);
         }
     }
 
     async function runAiInsights(prods: Product[]) {
+        if (currentPlan === 'free' || !hasFeature('ai_daily_insights')) {
+            setIsAnalyzing(false);
+            setPricingSuggestions([]);
+            setStockPredictions([]);
+            return;
+        }
+
         setIsAnalyzing(true);
         try {
             const dataToAnalyze = prods && prods.length > 0 ? prods : mockDb.products;
 
             // Fetch pricing suggestions
-            const resPrice = await fetch('/api/insights', {
+            const resPrice = await apiFetch('/api/insights', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type: 'pricing', vendorData: dataToAnalyze })
+                body: JSON.stringify({ type: 'pricing', vendorId: user?.id, vendorPlan: currentPlan, vendorData: dataToAnalyze })
             });
             if (resPrice.ok) {
                 const dataPrice = await resPrice.json();
@@ -152,7 +162,7 @@ export default function AiInsightsPage() {
                         reason: `High weekend demand anticipated for ${p.name}. A modest price bump optimizes margin.`
                     })));
                 }
-            } else {
+            } else if (resPrice.status !== 403) {
                 setPricingSuggestions(dataToAnalyze.slice(0, 3).map(p => ({
                     productId: p.name,
                     suggestedPrice: Math.round(p.price * 1.1),
@@ -161,10 +171,10 @@ export default function AiInsightsPage() {
             }
 
             // Fetch stock predictions
-            const resStock = await fetch('/api/insights', {
+            const resStock = await apiFetch('/api/insights', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type: 'stock', vendorData: dataToAnalyze })
+                body: JSON.stringify({ type: 'stock', vendorId: user?.id, vendorPlan: currentPlan, vendorData: dataToAnalyze })
             });
             if (resStock.ok) {
                 const dataStock = await resStock.json();
@@ -177,7 +187,7 @@ export default function AiInsightsPage() {
                         recommendation: `Stock velocity indicates ${p.name} will deplete in ~${Math.max(1, Math.floor(p.stock / 10))} days. Restock recommended.`
                     })));
                 }
-            } else {
+            } else if (resStock.status !== 403) {
                 setStockPredictions(dataToAnalyze.slice(0, 3).map(p => ({
                     productId: p.name,
                     daysLeft: Math.max(1, Math.floor(p.stock / 10)),
@@ -186,17 +196,6 @@ export default function AiInsightsPage() {
             }
         } catch (err) {
             console.error('Error running AI insights:', err);
-            const fallbackProds = prods && prods.length > 0 ? prods : mockDb.products;
-            setPricingSuggestions(fallbackProds.slice(0, 3).map(p => ({
-                productId: p.name,
-                suggestedPrice: Math.round(p.price * 1.1),
-                reason: `Optimal pricing strategy recommendation for ${p.name}.`
-            })));
-            setStockPredictions(fallbackProds.slice(0, 3).map(p => ({
-                productId: p.name,
-                daysLeft: 3,
-                recommendation: `Inventory for ${p.name} predicted to run low in 3 days.`
-            })));
         } finally {
             setIsAnalyzing(false);
         }

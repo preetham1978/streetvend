@@ -4,6 +4,7 @@ export interface ProductTemplate {
   defaultUnit: string;
   category: string;
   type: 'product' | 'service';
+  defaultPrice?: number;
 }
 
 export const PRODUCT_TEMPLATES: Record<string, ProductTemplate[]> = {
@@ -163,10 +164,38 @@ export const PRODUCT_TEMPLATES: Record<string, ProductTemplate[]> = {
     { name: "Grilled Fish", defaultUnit: "plate", category: "Grill", type: 'product' },
     { name: "Rumali Roti", defaultUnit: "piece", category: "Bread", type: 'product' },
     { name: "Butter Naan", defaultUnit: "piece", category: "Bread", type: 'product' },
+  ],
+  "Timber & Wood Trading": [
+    { name: "Teak Wood Batch (2.92 CBM / 42 Pcs - Bill #25)", defaultUnit: "CBM", category: "Teak Wood", type: 'product', defaultPrice: 116090.09 },
+    { name: "Teak Wood Cut Size 6\" x 9\" (Door Frame)", defaultUnit: "CBM", category: "Teak Wood", type: 'product', defaultPrice: 116090.09 },
+    { name: "Teak Wood Cut Size 5\" x 3\" (Window Frame)", defaultUnit: "CBM", category: "Teak Wood", type: 'product', defaultPrice: 116090.09 },
+    { name: "Teak Wood Cut Size 12\" x 4\" (Threshold Beam)", defaultUnit: "CBM", category: "Teak Wood", type: 'product', defaultPrice: 116090.09 },
+    { name: "Teak Wood Cut Size 12½' x 2\" (Planks)", defaultUnit: "CBM", category: "Teak Wood", type: 'product', defaultPrice: 116090.09 },
+    { name: "Teak Wood Cut Size 8\" x 6\" (Main Pillar)", defaultUnit: "CBM", category: "Teak Wood", type: 'product', defaultPrice: 116090.09 },
+    { name: "Teak Wood Cut Size 7\" x 14\" (Heavy Roof Beam)", defaultUnit: "CBM", category: "Teak Wood", type: 'product', defaultPrice: 116090.09 },
+    { name: "Teak Wood Cut Size 4\" x 3\" (Sub Post)", defaultUnit: "CBM", category: "Teak Wood", type: 'product', defaultPrice: 116090.09 },
+    { name: "Teak Wood Cut Size 6.5\" x 10\" (Door Frame)", defaultUnit: "CBM", category: "Teak Wood", type: 'product', defaultPrice: 116090.09 },
+    { name: "Teak Wood Cut Size 13\" x 12.5\" (Table Slab)", defaultUnit: "CBM", category: "Teak Wood", type: 'product', defaultPrice: 116090.09 },
+    { name: "Teak Wood Cut Size 2\" x 100\" (Long Battens)", defaultUnit: "CBM", category: "Teak Wood", type: 'product', defaultPrice: 116090.09 },
+    { name: "Teak Wood Cut Size 7\" x 40\" (Scaffolding Board)", defaultUnit: "CBM", category: "Teak Wood", type: 'product', defaultPrice: 116090.09 },
+    { name: "Teak Wood Cut Size 5\" x 60\" (Plank / Fascia)", defaultUnit: "CBM", category: "Teak Wood", type: 'product', defaultPrice: 116090.09 },
+    { name: "Teak Wood Cut Size 4\" x 2\" (Rafter / Joist)", defaultUnit: "CBM", category: "Teak Wood", type: 'product', defaultPrice: 116090.09 },
+    { name: "Teak Wood Cut Size 3\" x 3\" (Runner / Batten)", defaultUnit: "CBM", category: "Teak Wood", type: 'product', defaultPrice: 116090.09 },
+    { name: "Teak Wood Logs (Grade A)", defaultUnit: "CFT", category: "Teak Wood", type: 'product', defaultPrice: 1450 },
+    { name: "Sal Wood Cut Sizes (3.5x3 & 4x3)", defaultUnit: "CFT", category: "Sal Wood", type: 'product', defaultPrice: 1100 },
+    { name: "Rosewood Cut Sizes", defaultUnit: "CFT", category: "Rosewood", type: 'product', defaultPrice: 2600 },
+    { name: "Pine Wood Planks", defaultUnit: "CFT", category: "Pine Wood", type: 'product', defaultPrice: 680 },
+    { name: "Commercial Plywood 8x4 (18mm)", defaultUnit: "sheet", category: "Plywood", type: 'product', defaultPrice: 1850 },
+    { name: "Marine Plywood 8x4 (12mm)", defaultUnit: "sheet", category: "Plywood", type: 'product', defaultPrice: 2200 },
+    { name: "Veneer Sheet (8x4)", defaultUnit: "sqft", category: "Veneer", type: 'product', defaultPrice: 180 },
   ]
 };
 
 // Aliases for matching
+PRODUCT_TEMPLATES["Timber Merchant"] = PRODUCT_TEMPLATES["Timber & Wood Trading"];
+PRODUCT_TEMPLATES["Timber & Wood"] = PRODUCT_TEMPLATES["Timber & Wood Trading"];
+PRODUCT_TEMPLATES["Wood Merchant"] = PRODUCT_TEMPLATES["Timber & Wood Trading"];
+PRODUCT_TEMPLATES["Timber Store"] = PRODUCT_TEMPLATES["Timber & Wood Trading"];
 PRODUCT_TEMPLATES["Kirana & General"] = PRODUCT_TEMPLATES["Groceries"];
 PRODUCT_TEMPLATES["Grocery"] = PRODUCT_TEMPLATES["Groceries"];
 PRODUCT_TEMPLATES["General Store"] = PRODUCT_TEMPLATES["Groceries"];

@@ -29,7 +29,6 @@ export default function Home() {
 
     const features = [
         { title: 'Easy Product Management', desc: 'Add, update, or remove products in seconds. Organize by category and track stock status.', icon: ShoppingBasket, color: 'text-brand-500', bg: 'bg-brand-500/10' },
-        { title: 'Boli Mode — Voice Bills', desc: 'Tap the mic and speak in your language. Auto cart, cash/UPI, stock update & WhatsApp draft — no typing in a rush.', icon: Headphones, color: 'text-accent-blue', bg: 'bg-accent-blue/10' },
         { title: 'WhatsApp Billing', desc: 'Generate bills instantly and send them directly to your customer\'s WhatsApp. No printer needed.', icon: MessageSquare, color: 'text-accent-green', bg: 'bg-accent-green/10' },
         { title: 'Print Bills', desc: 'Starter plan and above lets you print professional bills for customers who want a physical copy.', icon: Receipt, color: 'text-accent-gray', bg: 'bg-accent-gray/10' },
         { title: 'AI Smart Pricing', desc: 'AI analyzes market data and demand to suggest optimal prices for your products.', icon: Sparkles, color: 'text-accent-pink', bg: 'bg-accent-pink/10' },
@@ -40,26 +39,26 @@ export default function Home() {
     return (
         <div className="flex flex-col bg-bg-base">
             {/* Hero Section */}
-            <section className="relative pt-20 pb-32 overflow-hidden hero-glow">
+            <section className="relative pt-12 lg:pt-16 pb-16 lg:pb-20 overflow-hidden hero-glow">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-center mb-12">
+                    <div className="flex justify-center mb-8">
                         <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-brand-500/10 border border-brand-500/30 shadow-[0_0_20px_rgba(249,115,22,0.2)]">
                             <span className="w-2.5 h-2.5 rounded-full bg-brand-500 animate-pulse"></span>
                             <span className="text-sm font-bold gradient-text">{t('metadata.tagline')}</span>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
                         <div className="text-center lg:text-left">
-                            <h1 className="text-6xl sm:text-7xl lg:text-8xl font-display font-bold tracking-tight mb-8 leading-[0.9]">
+                            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-display font-bold tracking-tight mb-6 leading-[0.95]">
                                 <span className="block text-text-primary">{t('home.hero.title1')}</span>
                                 <span className="block gradient-text">{t('home.hero.title2')} {t('home.hero.title3')}</span>
                                 <span className="block gradient-text">{t('home.hero.title4')}</span>
                             </h1>
-                            <p className="text-xl text-text-secondary mb-10 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+                            <p className="text-lg sm:text-xl text-text-secondary mb-8 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
                                 {t('home.hero.subtitle')}
                             </p>
-                            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-12">
+                            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-8">
                                 <Link to="/register" className="w-full sm:w-auto px-8 py-4 rounded-full primary-button-gradient text-white font-bold text-lg transition-all transform hover:scale-105 shadow-xl shadow-brand-500/25 flex items-center justify-center gap-2">
                                     {t('home.hero.cta.start')} <ArrowRight className="w-5 h-5" />
                                 </Link>
@@ -67,7 +66,7 @@ export default function Home() {
                                     {t('home.hero.cta.plans')}
                                 </Link>
                             </div>
-                            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4">
+                            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3">
                                 <StatPill text={t('home.hero.stats.vendors')} />
                                 <StatPill text={t('home.hero.stats.bills')} />
                                 <StatPill text={t('home.hero.stats.wa')} />
@@ -134,22 +133,22 @@ export default function Home() {
             </section>
 
             {/* Categories */}
-            <section className="py-32 border-y border-border-subtle">
+            <section className="py-16 sm:py-20 border-y border-border-subtle">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="text-center max-w-3xl mx-auto mb-20">
-                        <h2 className="text-5xl font-display font-bold mb-6">{t('home.categories.title')}</h2>
-                        <p className="text-lg text-text-secondary">
+                    <div className="text-center max-w-3xl mx-auto mb-12">
+                        <h2 className="text-4xl sm:text-5xl font-display font-bold mb-4">{t('home.categories.title')}</h2>
+                        <p className="text-base sm:text-lg text-text-secondary">
                             {t('home.categories.subtitle')}
                         </p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         {categories.map((cat, i) => (
-                            <div key={i} className="p-8 rounded-[2rem] bg-bg-surface border border-border-subtle hover:border-brand-500/50 transition-all group cursor-default">
-                                <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-transform group-hover:scale-110", cat.bg, cat.color)}>
-                                    <cat.icon className="w-7 h-7" />
+                            <div key={i} className="p-6 sm:p-8 rounded-[2rem] bg-bg-surface border border-border-subtle hover:border-brand-500/50 transition-all group cursor-default">
+                                <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-5 transition-transform group-hover:scale-110", cat.bg, cat.color)}>
+                                    <cat.icon className="w-6 h-6" />
                                 </div>
-                                <h3 className="font-bold text-xl mb-2 text-text-primary">{cat.name}</h3>
-                                <p className="text-sm text-text-secondary leading-relaxed">{cat.desc}</p>
+                                <h3 className="font-bold text-lg sm:text-xl mb-2 text-text-primary">{cat.name}</h3>
+                                <p className="text-xs sm:text-sm text-text-secondary leading-relaxed">{cat.desc}</p>
                             </div>
                         ))}
                     </div>
@@ -157,22 +156,22 @@ export default function Home() {
             </section>
 
             {/* Features */}
-            <section className="py-32">
+            <section className="py-16 sm:py-20">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="text-center max-w-3xl mx-auto mb-20">
-                        <h2 className="text-5xl font-display font-bold mb-6">{t('home.features.title')}</h2>
-                        <p className="text-lg text-text-secondary">
+                    <div className="text-center max-w-3xl mx-auto mb-12">
+                        <h2 className="text-4xl sm:text-5xl font-display font-bold mb-4">{t('home.features.title')}</h2>
+                        <p className="text-base sm:text-lg text-text-secondary">
                             {t('home.features.subtitle')}
                         </p>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                         {features.map((feature, i) => (
-                            <div key={i} className="p-10 rounded-[2.5rem] bg-bg-surface border border-border-subtle hover:border-brand-500/30 transition-all">
-                                <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center mb-8", feature.bg, feature.color)}>
-                                    <feature.icon className="w-7 h-7" />
+                            <div key={i} className="p-8 sm:p-10 rounded-[2.5rem] bg-bg-surface border border-border-subtle hover:border-brand-500/30 transition-all">
+                                <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-6", feature.bg, feature.color)}>
+                                    <feature.icon className="w-6 h-6" />
                                 </div>
-                                <h3 className="font-bold text-2xl mb-4 text-text-primary">{feature.title}</h3>
-                                <p className="text-text-secondary leading-relaxed">{feature.desc}</p>
+                                <h3 className="font-bold text-xl sm:text-2xl mb-3 text-text-primary">{feature.title}</h3>
+                                <p className="text-sm text-text-secondary leading-relaxed">{feature.desc}</p>
                             </div>
                         ))}
                     </div>
@@ -180,23 +179,23 @@ export default function Home() {
             </section>
 
             {/* Steps */}
-            <section className="py-32 bg-bg-surface border-y border-border-subtle">
+            <section className="py-16 sm:py-20 bg-bg-surface border-y border-border-subtle">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <h2 className="text-5xl font-display font-bold mb-24 text-center">{t('home.steps.title')}</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <h2 className="text-4xl sm:text-5xl font-display font-bold mb-12 text-center">{t('home.steps.title')}</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
                         {[
                             { num: '01', title: 'Register Your Store', desc: 'Sign up with your name, phone, and store details. Choose your category and you\'re ready!' },
                             { num: '02', title: 'Add Your Products', desc: 'Quickly add products with prices and units. Organize them by category for easy browsing.' },
                             { num: '03', title: 'Start Billing', desc: 'Add items to cart, generate bills, and send them via WhatsApp or print. It\'s that simple!' }
                         ].map((step, i) => (
-                            <div key={i} className="relative p-10 rounded-[2.5rem] bg-bg-base border border-border-subtle transition-all overflow-hidden shadow-sm hover:shadow-xl">
-                                <div className="absolute -top-6 -right-6 text-8xl font-display font-bold text-brand-500/5 transition-colors pointer-events-none">
+                            <div key={i} className="relative p-8 sm:p-10 rounded-[2.5rem] bg-bg-base border border-border-subtle transition-all overflow-hidden shadow-sm hover:shadow-xl">
+                                <div className="absolute -top-6 -right-6 text-7xl sm:text-8xl font-display font-bold text-brand-500/5 transition-colors pointer-events-none">
                                     {step.num}
                                 </div>
                                 <div className="relative z-10">
-                                    <div className="text-brand-500 font-display font-bold text-xl mb-4 tracking-tighter opacity-50">{step.num}</div>
-                                    <h3 className="font-bold text-3xl mb-4 text-text-primary">{step.title}</h3>
-                                    <p className="text-text-secondary leading-relaxed text-lg">{step.desc}</p>
+                                    <div className="text-brand-500 font-display font-bold text-lg sm:text-xl mb-3 tracking-tighter opacity-50">{step.num}</div>
+                                    <h3 className="font-bold text-2xl sm:text-3xl mb-3 text-text-primary">{step.title}</h3>
+                                    <p className="text-text-secondary leading-relaxed text-sm sm:text-base">{step.desc}</p>
                                 </div>
                             </div>
                         ))}
@@ -205,7 +204,7 @@ export default function Home() {
             </section>
 
             {/* AI Callout */}
-            <section className="py-32 px-4">
+            <section className="py-16 sm:py-20 px-4">
                 <div className="max-w-6xl mx-auto bg-bg-surface rounded-[3.5rem] p-8 md:p-20 overflow-hidden relative border border-border-subtle shadow-2xl">
                     <div className="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-brand-500 via-transparent to-transparent"></div>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 relative z-10 items-center">
@@ -257,7 +256,7 @@ export default function Home() {
             </section>
 
             {/* Final CTA */}
-            <section className="py-40 bg-gradient-to-b from-[#FFFBF0] to-[#F5F5F5] border-t border-border-subtle text-center relative overflow-hidden">
+            <section className="py-20 sm:py-24 bg-gradient-to-b dark:from-bg-surface dark:to-bg-base from-[#FFFBF0] to-[#F5F5F5] border-t border-border-subtle text-center relative overflow-hidden">
                 <div className="absolute bottom-0 inset-x-0 flex items-end justify-center pointer-events-none select-none overflow-hidden">
                     <span 
                         className="text-[clamp(4rem,15vw,16rem)] font-display font-bold whitespace-nowrap uppercase tracking-tighter text-brand-500/[0.02] translate-y-[20%]"
@@ -266,15 +265,15 @@ export default function Home() {
                     </span>
                 </div>
                 <div className="max-w-4xl mx-auto px-4 relative z-10">
-                    <h2 className="text-6xl sm:text-7xl font-display font-bold text-[#111111] mb-10">{t('home.final.title')}</h2>
-                    <p className="text-2xl text-[#555555] mb-16 max-w-3xl mx-auto leading-relaxed">
+                    <h2 className="text-4xl sm:text-6xl font-display font-bold text-[#111111] dark:text-text-primary mb-6">{t('home.final.title')}</h2>
+                    <p className="text-lg sm:text-xl text-[#555555] dark:text-text-secondary mb-10 max-w-2xl mx-auto leading-relaxed">
                         {t('home.final.subtitle')}
                     </p>
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-                        <Link to="/register" className="w-full sm:w-auto px-12 py-6 rounded-full primary-button-gradient text-white font-bold text-xl hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-brand-500/25">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                        <Link to="/register" className="w-full sm:w-auto px-10 py-4.5 rounded-full primary-button-gradient text-white font-bold text-lg hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-brand-500/25">
                             Register Free
                         </Link>
-                        <Link to="/plans" className="w-full sm:w-auto px-12 py-6 rounded-full bg-white border border-border-subtle text-[#111111] font-bold text-xl transition-all hover:scale-105 hover:border-brand-500 shadow-sm">
+                        <Link to="/plans" className="w-full sm:w-auto px-10 py-4.5 rounded-full bg-white dark:bg-bg-surface border border-border-subtle text-[#111111] dark:text-text-primary font-bold text-lg transition-all hover:scale-105 hover:border-brand-500 shadow-sm">
                             View Pricing
                         </Link>
                     </div>

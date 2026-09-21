@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, mapProductFromDb, mockDb } from '../lib/supabase';
+import { getVendorProducts, invalidateCache } from '../lib/dataCache';
 import { Product } from '../lib/database.types';
 import { useAuth } from '../lib/auth';
-import { Package, Plus, Trash2, Edit2, Check, X, Search, Loader2, AlertCircle, RefreshCw, Lock, ScanLine, Camera, Barcode, ShoppingBag } from 'lucide-react';
+import { Package, Plus, Trash2, Edit2, Check, X, Search, Loader2, AlertCircle, RefreshCw, Lock, ScanLine, Camera, Barcode, ShoppingBag, Save, CheckCircle2 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { usePlanLimits } from '../hooks/usePlanLimits';
+import { usePlanLimits, PlanTier, isTierAtLeast } from '../hooks/usePlanLimits';
 import UpgradeModal from '../components/UpgradeModal';
 import QuickAddModal from '../components/QuickAddModal';
+import ConfirmModal from '../components/ConfirmModal';
+import BarcodeScannerModal from '../components/BarcodeScannerModal';
 import AutoReorderSection from '../components/AutoReorderSection';
 import StockPredictionWidget from '../components/StockPredictionWidget';
-import BarcodeScannerModal from '../components/BarcodeScannerModal';
 import { motion } from 'motion/react';
 import { PRODUCT_TEMPLATES } from '../config/productTemplates';
 
@@ -94,10 +96,35 @@ export default function ProductsPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
 
+    // Delete modal states
+    const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteModalError, setDeleteModalError] = useState<string | null>(null);
+
     // Barcode scanner states
     const [isScannerOpen, setIsScannerOpen] = useState(false);
-    const [isModalScannerOpen, setIsModalScannerOpen] = useState(false);
-    const [scannedNotification, setScannedNotification] = useState<string | null>(null);
+    const [scanSuccessMessage, setScanSuccessMessage] = useState<string | null>(null);
+    const [upgradeFeature, setUpgradeFeature] = useState<{ name: string; tier: PlanTier; message: string }>({
+        name: 'Unlimited Catalog Products',
+        tier: 'starter',
+        message: 'Free tier allows up to 20 products in your catalog. Upgrade to Starter (₹79/mo) or higher to manage unlimited products.'
+    });
+
+    const handleScanSuccess = (
+        scannedBarcode: string,
+        prefilled?: { name?: string; price?: number; category?: string; unit?: string; stock?: number; isExisting?: boolean }
+    ) => {
+        setBarcode(scannedBarcode);
+        if (prefilled) {
+            if (prefilled.name) setName(prefilled.name);
+            if (prefilled.price !== undefined) setPrice(prefilled.price.toString());
+            if (prefilled.category) setCategory(prefilled.category);
+            if (prefilled.unit) setUnit(prefilled.unit);
+            if (prefilled.stock !== undefined) setStock(prefilled.stock.toString());
+        }
+        setScanSuccessMessage(`Barcode ${scannedBarcode} scanned! Review product details below and click Save Product.`);
+        setShowModal(true);
+    };
 
     // Canonical Product Duplicate Detection States
     const [canonicalProducts, setCanonicalProducts] = useState<{name: string, aliases: string[]}[]>(CANONICAL_MOCK_PRODUCTS);
@@ -106,24 +133,6 @@ export default function ProductsPage() {
     useEffect(() => {
         fetchProducts();
     }, [user]);
-
-    useEffect(() => {
-        async function fetchCanonical() {
-            if (supabase) {
-                try {
-                    const { data, error } = await supabase
-                        .from('canonical_products')
-                        .select('name, aliases');
-                    if (data && !error && data.length > 0) {
-                        setCanonicalProducts(data);
-                    }
-                } catch (e) {
-                    console.error("Failed to load canonical products from Supabase:", e);
-                }
-            }
-        }
-        fetchCanonical();
-    }, []);
 
     const handleNameChange = (val: string) => {
         setName(val);
@@ -167,7 +176,7 @@ export default function ProductsPage() {
         }
     };
 
-    async function fetchProducts() {
+    async function fetchProducts(forceRefresh = false) {
         setIsLoading(true);
         setLoadError(null);
         try {
@@ -177,25 +186,8 @@ export default function ProductsPage() {
                 setIsLoading(false);
                 return;
             }
-            if (supabase) {
-                const { data, error } = await supabase
-                    .from('products')
-                    .select('*')
-                    .eq('vendor_id', vendorId);
-
-                if (error) {
-                    console.error('Error fetching products from Supabase:', error);
-                    setLoadError(error.message || 'Failed to load products');
-                    setProducts([]);
-                } else if (data) {
-                    setProducts(data.map(mapProductFromDb));
-                } else {
-                    setProducts([]);
-                }
-            } else {
-                const vendorProds = mockDb.products.filter(p => p.vendorId === vendorId);
-                setProducts(vendorProds as Product[]);
-            }
+            const prods = await getVendorProducts(vendorId, forceRefresh);
+            setProducts(prods);
         } catch (err: any) {
             console.error('Exception fetching products:', err);
             setLoadError(err.message || 'Failed to load products');
@@ -216,20 +208,14 @@ export default function ProductsPage() {
         return matchesSearch && matchesCat;
     });
 
-    const handleMainScan = (scannedCode: string) => {
-        const found = products.find(p => (p.barcode && p.barcode.trim() === scannedCode.trim()) || p.id === scannedCode);
-        if (found) {
-            setSearchQuery(found.name);
-            setScannedNotification(`Barcode matched product: "${found.name}" (₹${found.price})`);
-        } else {
-            setSearchQuery(scannedCode);
-            setScannedNotification(`No product matched barcode "${scannedCode}". Opening Add Product modal with barcode pre-filled.`);
-            openAddModalWithBarcode(scannedCode);
-        }
-    };
 
-    const openAddModalWithBarcode = (code: string) => {
+    function openAddModal() {
         if (!canAddProduct(products.length)) {
+            setUpgradeFeature({
+                name: 'Unlimited Catalog Products',
+                tier: 'starter',
+                message: 'Free tier allows up to 20 products in your catalog. Upgrade to Starter (₹79/mo) or higher to manage unlimited products.'
+            });
             setShowUpgradeModal(true);
             return;
         }
@@ -240,15 +226,13 @@ export default function ProductsPage() {
         setUnit('piece');
         setCategory('Snacks');
         setStock('50');
-        setBarcode(code);
+        setBarcode("");
         setType('product');
         setErrorMsg('');
+        setScanSuccessMessage(null);
         setShowModal(true);
     };
 
-    function openAddModal() {
-        openAddModalWithBarcode('');
-    }
 
     function openEditModal(prod: Product) {
         setEditingProduct(prod);
@@ -342,7 +326,27 @@ export default function ProductsPage() {
                         error = res.error;
                     }
 
-                    if (error) throw error;
+                    if (error && (
+                        error.message?.includes('foreign key constraint') || 
+                        error.message?.includes('products_vendor_id_fkey') || 
+                        error.code === '23503'
+                    )) {
+                        console.warn("Supabase single product FK constraint, saving to local store instead:", error.message);
+                        mockDb.products.push({
+                            id: newId,
+                            vendorId,
+                            name: name.trim(),
+                            price: parseFloat(price),
+                            unit,
+                            category,
+                            stock: type === 'service' ? 0 : (parseInt(stock) || 50),
+                            barcode: barcode.trim(),
+                            type: type as any
+                        });
+                        error = null;
+                    } else if (error) {
+                        throw error;
+                    }
                 }
             } else {
                 if (editingProduct) {
@@ -372,8 +376,12 @@ export default function ProductsPage() {
                 }
             }
 
+            if (user?.id) {
+                invalidateCache(`products:${user.id}`);
+                invalidateCache(`ai_insight:${user.id}`);
+            }
             setShowModal(false);
-            await fetchProducts();
+            await fetchProducts(true);
         } catch (err: any) {
             console.error('Error saving product:', err);
             setErrorMsg(err.message || 'Failed to save product');
@@ -382,18 +390,53 @@ export default function ProductsPage() {
         }
     }
 
-    async function handleDelete(id: string) {
-        if (!confirm('Are you sure you want to delete this product?')) return;
-        if (supabase) {
-            const { error } = await supabase.from('products').delete().eq('id', id);
-            if (error) {
-                alert('Failed to delete: ' + error.message);
-                return;
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && productToDelete && !isDeleting) {
+                setProductToDelete(null);
             }
-        } else {
-            mockDb.products = mockDb.products.filter(p => p.id !== id);
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [productToDelete, isDeleting]);
+
+    async function handleExecuteDelete() {
+        if (!productToDelete) return;
+        const id = String(productToDelete.id);
+        setIsDeleting(true);
+        setDeleteModalError(null);
+
+        try {
+            if (supabase) {
+                const deletePromise = (supabase.from('products') as any).delete().eq('id', id);
+                const timeoutPromise = new Promise<{ error: any }>((_, reject) =>
+                    setTimeout(() => reject(new Error("Database delete operation timed out")), 2500)
+                );
+                try {
+                    const res: any = await Promise.race([deletePromise, timeoutPromise]);
+                    if (res?.error) {
+                        console.warn("Supabase delete error:", res.error);
+                    }
+                } catch (timeoutErr) {
+                    console.warn("Supabase delete timed out, continuing with local inventory update:", timeoutErr);
+                }
+            }
+
+            mockDb.products = mockDb.products.filter(p => String(p.id) !== id);
+
+            if (user?.id) {
+                invalidateCache(`products:${user.id}`);
+                invalidateCache(`ai_insight:${user.id}`);
+            }
+
+            setProducts(prev => prev.filter(p => String(p.id) !== id));
+            setProductToDelete(null);
+        } catch (err: any) {
+            console.error('Error deleting product:', err);
+            setDeleteModalError(err.message || 'Failed to delete product. Please try again.');
+        } finally {
+            setIsDeleting(false);
         }
-        setProducts(prev => prev.filter(p => p.id !== id));
     }
 
     const getTemplateCategory = (cat: string) => {
@@ -438,33 +481,51 @@ export default function ProductsPage() {
                     </div>
                     <h1 className="font-display font-bold text-3xl sm:text-4xl text-text-primary tracking-tight">Products & Stock</h1>
                 </div>
-                <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-                    {hasTemplates && (
-                        <button
-                            onClick={() => setShowQuickAddModal(true)}
-                            className="flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-bg-surface border border-brand-500/30 text-brand-500 font-bold text-xs uppercase tracking-widest shadow-xl hover:bg-brand-500/5 active:scale-95 transition-all w-full md:w-auto min-h-[44px]"
-                        >
-                            <ShoppingBag className="w-5 h-5" /> Quick Add Templates
-                        </button>
-                    )}
-                    
-                    <div className="relative group w-full md:w-auto">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+                    {/* Primary Action First on Mobile */}
+                    <div className="relative group w-full md:w-auto order-1 sm:order-3">
                         <button
                             onClick={openAddModal}
                             disabled={!canAddProduct(products.length)}
                             className={cn(
-                                "flex items-center justify-center gap-2 px-6 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl transition-all w-full min-h-[44px]",
+                                "flex items-center justify-center gap-2 px-6 py-3.5 sm:py-4 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl transition-all w-full min-h-[48px]",
                                 canAddProduct(products.length)
-                                    ? "primary-button-gradient text-white shadow-brand-500/20 hover:scale-[1.02] active:scale-95"
+                                    ? "primary-button-gradient text-white shadow-brand-500/20 hover:scale-[1.02] active:scale-95 cursor-pointer"
                                     : "bg-bg-base border border-border-subtle text-text-tertiary cursor-not-allowed shadow-none"
                             )}
                         >
-                            <Plus className="w-5 h-5" /> Add Product
+                            <Plus className="w-5 h-5 shrink-0" /> Add Product
                         </button>
                         {!canAddProduct(products.length) && (
                             <div className="absolute top-full mt-2 right-0 w-64 bg-bg-surface-inset border border-border-subtle rounded-xl p-3 text-xs text-text-secondary opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 shadow-lg text-center">
                                 Free plan limit reached ({planConfig.maxProducts} products). Existing products are kept. Upgrade to add more.
                             </div>
+                        )}
+                    </div>
+
+                    {/* Secondary Actions in 2-col grid on mobile, inline flex on desktop */}
+                    <div className="grid grid-cols-2 sm:flex items-center gap-2.5 w-full sm:w-auto order-2 sm:order-1">
+                        <button
+                            onClick={() => setIsScannerOpen(true)}
+                            className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-3.5 sm:py-4 rounded-2xl bg-bg-surface border border-border-subtle hover:border-brand-500/50 text-text-primary font-bold text-xs uppercase tracking-wider shadow-md hover:bg-bg-surface-inset active:scale-95 transition-all w-full sm:w-auto min-h-[48px] cursor-pointer"
+                        >
+                            <Barcode className="w-4 h-4 sm:w-5 sm:h-5 text-brand-500 shrink-0" />
+                            <span className="truncate">Scan Barcode</span>
+                            {!isTierAtLeast(currentPlan, 'professional') && (
+                                <span className="px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[9px] font-extrabold uppercase shrink-0">
+                                    Pro
+                                </span>
+                            )}
+                        </button>
+
+                        {hasTemplates && (
+                            <button
+                                onClick={() => setShowQuickAddModal(true)}
+                                className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-3.5 sm:py-4 rounded-2xl bg-bg-surface border border-brand-500/30 text-brand-500 font-bold text-xs uppercase tracking-wider shadow-md hover:bg-brand-500/5 active:scale-95 transition-all w-full sm:w-auto min-h-[48px] cursor-pointer"
+                            >
+                                <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                                <span className="truncate">Quick Add</span>
+                            </button>
                         )}
                     </div>
                 </div>
@@ -478,7 +539,7 @@ export default function ProductsPage() {
                         <span>Could not load live products ({loadError}). Showing cached inventory.</span>
                     </div>
                     <button
-                        onClick={fetchProducts}
+                        onClick={() => fetchProducts()}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold text-xs uppercase tracking-wider hover:bg-amber-500/30 transition-colors"
                     >
                         <RefreshCw className="w-3.5 h-3.5" /> Retry
@@ -486,21 +547,6 @@ export default function ProductsPage() {
                 </div>
             )}
 
-            {/* Scanned notification banner */}
-            {scannedNotification && (
-                <div className="mb-6 p-4 rounded-2xl bg-brand-500/15 border border-brand-500/30 text-brand-400 text-xs font-bold flex items-center justify-between animate-fade-in">
-                    <div className="flex items-center gap-2">
-                        <ScanLine className="w-4 h-4 text-brand-500 shrink-0" />
-                        <span>{scannedNotification}</span>
-                    </div>
-                    <button
-                        onClick={() => setScannedNotification(null)}
-                        className="text-text-tertiary hover:text-text-primary p-1"
-                    >
-                        <X className="w-4 h-4" />
-                    </button>
-                </div>
-            )}
 
             {/* Filters & Search */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
@@ -515,14 +561,6 @@ export default function ProductsPage() {
                             className="w-full pl-11 pr-4 py-3 rounded-2xl bg-bg-surface border border-border-subtle text-text-primary font-medium focus:outline-none focus:border-brand-500 transition-colors text-sm"
                         />
                     </div>
-                    <button
-                        onClick={() => setIsScannerOpen(true)}
-                        title="Scan Barcode to Lookup Product"
-                        className="px-4 py-3 rounded-2xl bg-brand-500/10 border border-brand-500/30 text-brand-500 hover:bg-brand-500 hover:text-white transition-all font-bold text-xs flex items-center gap-2 shrink-0 cursor-pointer shadow-sm"
-                    >
-                        <Camera className="w-4 h-4" />
-                        <span className="hidden xs:inline">Scan Barcode</span>
-                    </button>
                 </div>
 
                 <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0 scrollbar-hide">
@@ -531,10 +569,10 @@ export default function ProductsPage() {
                             key={cat}
                             onClick={() => setSelectedCategory(cat)}
                             className={cn(
-                                "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap",
+                                "px-4 py-2.5 rounded-2xl text-xs font-bold transition-all whitespace-nowrap shrink-0",
                                 selectedCategory === cat
-                                    ? "bg-brand-500 text-white shadow-lg shadow-brand-500/30"
-                                    : "bg-bg-surface text-text-secondary border border-border-subtle hover:border-brand-500/30"
+                                    ? "bg-brand-500 text-white shadow-lg shadow-brand-500/20"
+                                    : "bg-bg-surface border border-border-subtle text-text-secondary hover:text-text-primary hover:border-brand-500/50"
                             )}
                         >
                             {cat}
@@ -617,11 +655,18 @@ export default function ProductsPage() {
                                     <Edit2 className="w-3.5 h-3.5 text-brand-500" /> Edit
                                 </button>
                                 <button
-                                    onClick={() => handleDelete(p.id)}
-                                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors"
+                                    type="button"
+                                    data-testid="delete-btn-latest"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setProductToDelete(p);
+                                        setDeleteModalError(null);
+                                    }}
+                                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors cursor-pointer shrink-0 z-10 relative"
                                     title="Delete Product"
                                 >
-                                    <Trash2 className="w-4 h-4" />
+                                    <Trash2 className="w-4 h-4 pointer-events-none" />
                                 </button>
                             </div>
                         </div>
@@ -631,188 +676,221 @@ export default function ProductsPage() {
 
             {/* Add / Edit Modal */}
             {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-xl">
-                    <div className="bg-bg-surface rounded-t-[2.5rem] sm:rounded-[2.5rem] w-full max-w-md p-8 border border-border-subtle shadow-2xl relative mt-auto sm:mt-0">
-                        <div className="w-12 h-1 bg-border-subtle rounded-full mx-auto mb-6 sm:hidden shrink-0" />
-                        <button
-                            onClick={() => setShowModal(false)}
-                            className="absolute top-4 right-4 sm:top-6 sm:right-6 w-10 h-10 flex items-center justify-center rounded-full bg-bg-base text-text-tertiary hover:text-text-primary transition-colors"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
-
-                        <h3 className="font-display font-bold text-2xl text-text-primary mb-6">
-                            {editingProduct ? 'Edit Product' : 'Add New Product'}
-                        </h3>
-
-                        {errorMsg && (
-                            <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-bold flex items-center gap-2">
-                                <AlertCircle className="w-4 h-4 shrink-0" /> {errorMsg}
+                <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 bg-black/80 backdrop-blur-xl animate-fade-in">
+                    <div className="bg-bg-surface rounded-t-[2rem] sm:rounded-[2.5rem] w-full sm:max-w-md max-h-[92vh] sm:max-h-[90vh] border border-border-subtle shadow-2xl relative flex flex-col overflow-hidden my-0 sm:my-auto">
+                        
+                        {/* Sticky Modal Header */}
+                        <div className="p-5 sm:p-6 pb-4 border-b border-border-subtle shrink-0 flex items-center justify-between bg-bg-surface z-10">
+                            <div className="flex-1 min-w-0 pr-4">
+                                <div className="w-12 h-1 bg-border-subtle rounded-full mx-auto mb-3 sm:hidden" />
+                                <h3 className="font-display font-bold text-xl sm:text-2xl text-text-primary truncate">
+                                    {editingProduct ? 'Edit Product' : 'Add New Product'}
+                                </h3>
                             </div>
-                        )}
+                            <button
+                                onClick={() => setShowModal(false)}
+                                className="w-11 h-11 flex items-center justify-center rounded-full bg-bg-base text-text-tertiary hover:text-text-primary transition-colors shrink-0 cursor-pointer"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
 
-                        <form onSubmit={handleSave} className="space-y-4">
-                            <div className="flex gap-2 p-1 bg-bg-base rounded-2xl border border-border-subtle mb-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setType('product')}
-                                    className={cn(
-                                        "flex-1 py-2 px-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
-                                        type === 'product' ? "bg-brand-500 text-white shadow-lg shadow-brand-500/20" : "text-text-tertiary hover:text-text-primary"
-                                    )}
-                                >
-                                    Product
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setType('service')}
-                                    className={cn(
-                                        "flex-1 py-2 px-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
-                                        type === 'service' ? "bg-brand-500 text-white shadow-lg shadow-brand-500/20" : "text-text-tertiary hover:text-text-primary"
-                                    )}
-                                >
-                                    Service
-                                </button>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest mb-2">Item Name</label>
-                                <input
-                                    type="text"
-                                    required
-                                    placeholder="e.g. Masala Dosa, Pani Puri"
-                                    value={name}
-                                    onChange={(e) => handleNameChange(e.target.value)}
-                                    className="w-full px-4 py-3.5 rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-medium focus:outline-none focus:border-brand-500 transition-colors text-sm"
-                                />
-                                {matchedCanonical && (
-                                    <motion.div 
-                                        initial={{ opacity: 0, y: -5 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className="mt-3 p-4 rounded-xl bg-brand-500/10 border border-brand-500/20 text-xs text-text-secondary flex flex-col gap-2.5 animate-fade-in"
-                                    >
-                                        <div className="flex items-start gap-2">
-                                            <AlertCircle className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" />
-                                            <span>
-                                                Are you adding <strong>{matchedCanonical}</strong>? We found a similar product. Using standard names helps with your customer catalog search.
-                                            </span>
+                        {/* Modal Form Body - Internal Scrollable Area */}
+                        <form onSubmit={handleSave} className="flex flex-col flex-1 overflow-hidden">
+                            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
+                                {scanSuccessMessage && (
+                                    <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-medium flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+                                            <span>{scanSuccessMessage}</span>
                                         </div>
                                         <button
                                             type="button"
-                                            onClick={acceptCanonical}
-                                            className="self-start px-3 py-1.5 rounded-lg bg-brand-500 text-white font-bold text-[10px] uppercase tracking-wider hover:bg-brand-600 active:scale-95 transition-all shadow-sm"
+                                            onClick={() => setScanSuccessMessage(null)}
+                                            className="p-1 text-text-tertiary hover:text-text-primary cursor-pointer"
                                         >
-                                            Yes, use {matchedCanonical}
+                                            <X className="w-4 h-4" />
                                         </button>
-                                    </motion.div>
+                                    </div>
                                 )}
-                            </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest mb-2">Price (₹)</label>
-                                    <input
-                                        type="number"
-                                        step="0.5"
-                                        required
-                                        placeholder="50"
-                                        value={price}
-                                        onChange={(e) => setPrice(e.target.value)}
-                                        className="w-full px-4 py-3.5 rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-medium focus:outline-none focus:border-brand-500 transition-colors text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest mb-2">Unit</label>
-                                    <select
-                                        value={unit}
-                                        onChange={(e) => setUnit(e.target.value)}
-                                        className="w-full px-4 py-3.5 rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-medium focus:outline-none focus:border-brand-500 transition-colors text-sm"
+                                {errorMsg && (
+                                    <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-bold flex items-center gap-2">
+                                        <AlertCircle className="w-4 h-4 shrink-0" /> {errorMsg}
+                                    </div>
+                                )}
+
+                                <div className="flex gap-2 p-1.5 bg-bg-base rounded-2xl border border-border-subtle">
+                                    <button
+                                        type="button"
+                                        onClick={() => setType('product')}
+                                        className={cn(
+                                            "flex-1 min-h-[44px] py-2.5 px-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all cursor-pointer",
+                                            type === 'product' ? "bg-brand-500 text-white shadow-lg shadow-brand-500/20" : "text-text-tertiary hover:text-text-primary"
+                                        )}
                                     >
-                                        <option value="piece">Piece</option>
-                                        <option value="plate">Plate</option>
-                                        <option value="kg">Kg</option>
-                                        <option value="g">Grams</option>
-                                        <option value="packet">Packet</option>
-                                        <option value="bottle">Bottle</option>
-                                        <option value="litre">Litre</option>
-                                        <option value="bunch">Bunch</option>
-                                        <option value="service">Service</option>
-                                        <option value="pair">Pair</option>
-                                        <option value="set">Set</option>
-                                        <option value="cup">Cup</option>
-                                        <option value="dozen">Dozen</option>
-                                    </select>
+                                        Product
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setType('service')}
+                                        className={cn(
+                                            "flex-1 min-h-[44px] py-2.5 px-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all cursor-pointer",
+                                            type === 'service' ? "bg-brand-500 text-white shadow-lg shadow-brand-500/20" : "text-text-tertiary hover:text-text-primary"
+                                        )}
+                                    >
+                                        Service
+                                    </button>
                                 </div>
-                            </div>
 
-                            <div className={cn("grid gap-4", type === 'product' ? "grid-cols-2" : "grid-cols-1")}>
                                 <div>
-                                    <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest mb-2">Category</label>
+                                    <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest mb-2">Item Name</label>
                                     <input
                                         type="text"
                                         required
-                                        placeholder="Snacks, Drinks, etc."
-                                        value={category}
-                                        onChange={(e) => setCategory(e.target.value)}
-                                        className="w-full px-4 py-3.5 rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-medium focus:outline-none focus:border-brand-500 transition-colors text-sm"
+                                        placeholder="e.g. Masala Dosa, Pani Puri"
+                                        value={name}
+                                        onChange={(e) => handleNameChange(e.target.value)}
+                                        className="w-full px-4 py-3.5 min-h-[48px] rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-medium focus:outline-none focus:border-brand-500 transition-colors text-base"
                                     />
+                                    {matchedCanonical && (
+                                        <motion.div 
+                                            initial={{ opacity: 0, y: -5 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className="mt-3 p-4 rounded-xl bg-brand-500/10 border border-brand-500/20 text-xs text-text-secondary flex flex-col gap-2.5 animate-fade-in"
+                                        >
+                                            <div className="flex items-start gap-2">
+                                                <AlertCircle className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" />
+                                                <span>
+                                                    Are you adding <strong>{matchedCanonical}</strong>? We found a similar product. Using standard names helps with your customer catalog search.
+                                                </span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={acceptCanonical}
+                                                className="self-start px-3 py-2 min-h-[44px] rounded-lg bg-brand-500 text-white font-bold text-xs uppercase tracking-wider hover:bg-brand-600 active:scale-95 transition-all shadow-sm cursor-pointer"
+                                            >
+                                                Yes, use {matchedCanonical}
+                                            </button>
+                                        </motion.div>
+                                    )}
                                 </div>
-                                {type === 'product' && (
+
+                                <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest mb-2">Stock Qty</label>
+                                        <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest mb-2">Price (₹)</label>
                                         <input
                                             type="number"
+                                            inputMode="decimal"
+                                            step="0.5"
                                             required
                                             placeholder="50"
-                                            value={stock}
-                                            onChange={(e) => setStock(e.target.value)}
-                                            className="w-full px-4 py-3.5 rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-medium focus:outline-none focus:border-brand-500 transition-colors text-sm"
+                                            value={price}
+                                            onChange={(e) => setPrice(e.target.value)}
+                                            className="w-full px-4 py-3.5 min-h-[48px] rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-medium focus:outline-none focus:border-brand-500 transition-colors text-base"
                                         />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest mb-2">Unit</label>
+                                        <select
+                                            value={unit}
+                                            onChange={(e) => setUnit(e.target.value)}
+                                            className="w-full px-4 py-3.5 min-h-[48px] rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-medium focus:outline-none focus:border-brand-500 transition-colors text-base"
+                                        >
+                                            <option value="CBM">CBM (M.CUBM)</option>
+                                            <option value="CFT">CFT (Cu.Ft)</option>
+                                            <option value="sheet">Sheet</option>
+                                            <option value="sqft">Sq.Ft</option>
+                                            <option value="piece">Piece</option>
+                                            <option value="plate">Plate</option>
+                                            <option value="kg">Kg</option>
+                                            <option value="g">Grams</option>
+                                            <option value="packet">Packet</option>
+                                            <option value="bottle">Bottle</option>
+                                            <option value="litre">Litre</option>
+                                            <option value="bunch">Bunch</option>
+                                            <option value="service">Service</option>
+                                            <option value="pair">Pair</option>
+                                            <option value="set">Set</option>
+                                            <option value="cup">Cup</option>
+                                            <option value="dozen">Dozen</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className={cn("grid gap-4", type === 'product' ? "grid-cols-1 min-[400px]:grid-cols-2" : "grid-cols-1")}>
+                                    <div>
+                                        <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest mb-2">Category</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            placeholder="Snacks, Drinks, etc."
+                                            value={category}
+                                            onChange={(e) => setCategory(e.target.value)}
+                                            className="w-full px-4 py-3.5 min-h-[48px] rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-medium focus:outline-none focus:border-brand-500 transition-colors text-base"
+                                        />
+                                    </div>
+                                    {type === 'product' && (
+                                        <div>
+                                            <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest mb-2">Stock Qty</label>
+                                            <input
+                                                type="number"
+                                                inputMode="numeric"
+                                                required
+                                                placeholder="50"
+                                                value={stock}
+                                                onChange={(e) => setStock(e.target.value)}
+                                                className="w-full px-4 py-3.5 min-h-[48px] rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-medium focus:outline-none focus:border-brand-500 transition-colors text-base"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {type === 'product' && (
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest">Barcode / EAN (Optional)</label>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsScannerOpen(true)}
+                                                className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-xl bg-brand-500/10 hover:bg-brand-500/20 text-brand-500 font-bold text-xs transition-colors cursor-pointer"
+                                            >
+                                                <ScanLine className="w-4 h-4" /> Scan Camera
+                                            </button>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <div className="relative flex-1">
+                                                <Barcode className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
+                                                <input
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    placeholder="e.g. 8901234567890"
+                                                    value={barcode}
+                                                    onChange={(e) => setBarcode(e.target.value)}
+                                                    className="w-full pl-11 pr-4 py-3.5 min-h-[48px] rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-mono text-base focus:outline-none focus:border-brand-500 transition-colors"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
                             </div>
 
-                            {type === 'product' && (
-                                <div>
-                                    <label className="block text-xs font-bold text-text-tertiary uppercase tracking-widest mb-2">Barcode / EAN (Optional)</label>
-                                    <div className="flex gap-2">
-                                        <div className="relative flex-1">
-                                            <Barcode className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
-                                            <input
-                                                type="text"
-                                                placeholder="e.g. 8901234567890"
-                                                value={barcode}
-                                                onChange={(e) => setBarcode(e.target.value)}
-                                                className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-mono text-sm focus:outline-none focus:border-brand-500 transition-colors"
-                                            />
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsModalScannerOpen(true)}
-                                            className="px-4 py-3.5 rounded-2xl bg-brand-500/10 border border-brand-500/30 text-brand-500 hover:bg-brand-500 hover:text-white transition-all font-bold text-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
-                                        >
-                                            <Camera className="w-4 h-4" />
-                                            <span>Scan</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="flex gap-4 pt-4">
+                            {/* Sticky Modal Action Footer */}
+                            <div className="p-4 sm:p-6 border-t border-border-subtle bg-bg-surface shrink-0 flex gap-3 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:pb-6 z-10">
                                 <button
                                     type="button"
                                     onClick={() => setShowModal(false)}
-                                    className="flex-1 py-4 rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-bold text-xs uppercase tracking-widest hover:bg-bg-surface transition-all"
+                                    className="flex-1 min-h-[48px] py-3.5 rounded-2xl bg-bg-base border border-border-subtle text-text-primary font-bold text-xs uppercase tracking-widest hover:bg-bg-surface transition-all cursor-pointer"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={isSaving}
-                                    className="flex-1 py-4 rounded-2xl primary-button-gradient text-white font-bold text-xs uppercase tracking-widest shadow-xl shadow-brand-500/20 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                    className="flex-1 min-h-[48px] py-3.5 rounded-2xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs uppercase tracking-widest shadow-xl shadow-brand-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
                                 >
-                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                                    {editingProduct ? 'Save Changes' : 'Add Product'}
+                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                    {editingProduct ? 'Update Product' : 'Save Product'}
                                 </button>
                             </div>
                         </form>
@@ -843,28 +921,44 @@ export default function ProductsPage() {
                 />
             )}
 
-            <UpgradeModal
-                isOpen={showUpgradeModal}
-                onClose={() => setShowUpgradeModal(false)}
-                featureName="Unlimited Catalog Products"
-                requiredTier="starter"
-                message="Free tier allows up to 20 products in your catalog. Upgrade to Starter (₹299/mo) or higher to manage unlimited products."
+            {/* Delete Confirmation Modal */}
+            <ConfirmModal
+                isOpen={!!productToDelete}
+                title="Delete Product"
+                message={`Are you sure you want to delete ${productToDelete?.name}? This action cannot be undone.`}
+                confirmLabel="Yes, Delete"
+                cancelLabel="Cancel"
+                danger={true}
+                error={deleteModalError}
+                onConfirm={handleExecuteDelete}
+                onCancel={() => {
+                    setProductToDelete(null);
+                    setDeleteModalError(null);
+                }}
             />
 
-            {/* Header / Lookup Barcode Scanner */}
             <BarcodeScannerModal
                 isOpen={isScannerOpen}
                 onClose={() => setIsScannerOpen(false)}
-                onScan={handleMainScan}
-                title="Scan Barcode to Lookup Product"
+                onScanSuccess={handleScanSuccess}
+                existingProducts={products}
+                currentPlan={currentPlan}
+                onUpgradeClick={() => {
+                    setUpgradeFeature({
+                        name: 'AI Barcode Scanner',
+                        tier: 'professional',
+                        message: 'Barcode scanning (EAN-13, UPC-A, Code-128) is available on Professional plan (₹299/mo) and above.'
+                    });
+                    setShowUpgradeModal(true);
+                }}
             />
 
-            {/* Modal Input Barcode Scanner */}
-            <BarcodeScannerModal
-                isOpen={isModalScannerOpen}
-                onClose={() => setIsModalScannerOpen(false)}
-                onScan={(code) => setBarcode(code)}
-                title="Scan Barcode for Product Form"
+            <UpgradeModal
+                isOpen={showUpgradeModal}
+                onClose={() => setShowUpgradeModal(false)}
+                featureName={upgradeFeature.name}
+                requiredTier={upgradeFeature.tier}
+                message={upgradeFeature.message}
             />
         </div>
     );

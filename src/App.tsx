@@ -21,6 +21,7 @@ import AiMarketingConfig from './pages/AiMarketingConfig';
 import ExpensesPage from './pages/Expenses';
 import StorePage from './pages/Store';
 import AdminAnalytics from './pages/AdminAnalytics';
+import NotFound from './pages/NotFound';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -61,7 +62,7 @@ export default function App() {
             <MarketingConfigProvider>
               <BrowserRouter>
                 <ScrollToTop />
-                <div className="min-h-screen flex flex-col bg-bg-base text-text-primary transition-colors overflow-x-hidden max-w-[100vw]">
+                <div className="min-h-[100dvh] flex flex-col bg-bg-base text-text-primary transition-colors overflow-x-hidden w-full pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)]">
                   <Navigation />
                   <PWAInstallPrompt />
                   <main className="flex-grow">
@@ -72,7 +73,7 @@ export default function App() {
                       <Route path="/register" element={<Register />} />
                       <Route path="/dashboard" element={<ProtectedRoute><VendorDashboard /></ProtectedRoute>} />
                       <Route path="/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />
-                      <Route path="/cart" element={<CartPage />} />
+                      <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
                       <Route path="/store/:vendorId" element={<StorePage />} />
                       <Route path="/ai-assistant" element={<ProtectedRoute><AiAssistantPage /></ProtectedRoute>} />
                       <Route path="/ai-insights" element={<ProtectedRoute><AiInsightsPage /></ProtectedRoute>} />
@@ -82,6 +83,7 @@ export default function App() {
                       <Route path="/admin/dashboard" element={<AdminDashboard />} />
                       <Route path="/admin/login" element={<AdminDashboard />} />
                       <Route path="/admin/analytics" element={<AdminAnalytics />} />
+                      <Route path="*" element={<NotFound />} />
                     </Routes>
                   </main>
                   <Footer />

@@ -9,10 +9,9 @@ import {
     Legend
 } from 'recharts';
 import GatedChartWrapper from './GatedChartWrapper';
-import { Sparkles, Clock } from 'lucide-react';
+import { Sparkles, Clock, Loader2 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
-import { supabase } from '../lib/supabase';
-import { Loader2 } from 'lucide-react';
+import { getVendorOrders } from '../lib/dataCache';
 
 export default function AIForecastChart() {
     const { user } = useAuth();
@@ -20,36 +19,43 @@ export default function AIForecastChart() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        let isMounted = true;
         async function fetchForecastData() {
-            if (!user) return;
+            if (!user?.id) return;
             setIsLoading(true);
-            const { data: orders, error } = await supabase
-                .from('orders')
-                .select('*')
-                .eq('vendor_id', user.id);
-            
-            if (error || !orders) {
-                setData([]);
-            } else {
-                // Simplified forecast logic based on real orders
-                const dailyMap: Record<string, number> = {};
-                (orders as any[]).forEach(o => {
-                    const date = new Date(o.created_at).toLocaleDateString('en-US', { weekday: 'short' });
-                    dailyMap[date] = (dailyMap[date] || 0) + o.total;
-                });
-                
-                const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                const forecast = days.map(day => ({
-                    day,
-                    actual: dailyMap[day] || null,
-                    predicted: (dailyMap[day] || Math.random() * 3000 + 2000) * (0.9 + Math.random() * 0.2)
-                }));
-                setData(forecast);
+            try {
+                const orders = await getVendorOrders(user.id);
+                if (!isMounted) return;
+                if (!orders || orders.length === 0) {
+                    setData([]);
+                } else {
+                    const dailyMap: Record<string, number> = {};
+                    orders.forEach(o => {
+                        const parsedDate = o.createdAt ? new Date(o.createdAt) : null;
+                        const date = parsedDate && !isNaN(parsedDate.getTime()) 
+                            ? parsedDate.toLocaleDateString('en-US', { weekday: 'short' }) 
+                            : 'Mon';
+                        dailyMap[date] = (dailyMap[date] || 0) + (o.total || 0);
+                    });
+                    
+                    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                    const forecast = days.map(day => ({
+                        day,
+                        actual: dailyMap[day] || null,
+                        predicted: (dailyMap[day] || 2500) * 1.05
+                    }));
+                    setData(forecast);
+                }
+            } catch (err) {
+                console.error("AIForecastChart error:", err);
+                if (isMounted) setData([]);
+            } finally {
+                if (isMounted) setIsLoading(false);
             }
-            setIsLoading(false);
         }
         fetchForecastData();
-    }, [user]);
+        return () => { isMounted = false; };
+    }, [user?.id]);
 
     if (isLoading) return <div className="h-[300px] flex items-center justify-center"><Loader2 className="animate-spin w-8 h-8 text-brand-500" /></div>;
     if (data.length === 0) return (

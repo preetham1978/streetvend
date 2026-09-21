@@ -1,6 +1,8 @@
+import { apiFetch } from './apiFetch';
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Vendor } from './database.types';
 import { mockDb, supabase, mapVendorFromDb } from './supabase';
+import { getVendorProfile, invalidateCache } from './dataCache';
 
 interface AuthContextType {
     user: Vendor | null;
@@ -29,32 +31,85 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [isAdmin, setIsAdmin] = useState(false);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-    const fetchVendorProfile = async (userIdOrEmail: string): Promise<Vendor | null> => {
-        if (supabase) {
-            try {
-                let { data, error } = await supabase
-                    .from('vendors')
-                    .select('*')
-                    .or(`user_id.eq.${userIdOrEmail},id.eq.${userIdOrEmail},email.eq.${userIdOrEmail}`)
-                    .limit(1);
+    
+    // Device session enforcement
+    useEffect(() => {
+        if (user?.id) {
+            const checkSession = async () => {
+                const currentSessionId = localStorage.getItem('device_session_id') || ('s_' + Math.random().toString(36).substring(2, 9));
+                localStorage.setItem('device_session_id', currentSessionId);
                 
-                if ((!data || data.length === 0) && userIdOrEmail.includes('@')) {
-                    const { data: searchData } = await supabase
-                        .from('vendors')
-                        .select('*')
-                        .or(`email.ilike.%${userIdOrEmail}%,name.ilike.%Raju%`)
-                        .limit(1);
-                    data = searchData;
+                const isMobile = /iphone|ipad|ipod|android|mobile/.test(navigator.userAgent.toLowerCase());
+                const deviceName = isMobile ? 'Mobile Browser (This Device)' : 'Chrome on Desktop (This Browser)';
+                const deviceType = isMobile ? 'mobile' : 'desktop';
+
+                try {
+                    // Register on first load
+                    if (!(window as any).sessionRegistered) {
+                        const res = await apiFetch(`/api/vendor/${user.id}/sessions`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                sessionId: currentSessionId,
+                                deviceName,
+                                deviceType,
+                                location: 'India'
+                            })
+                        });
+                        if (res.status === 403) {
+                             console.error("Device limit reached.");
+                             if (supabase) await supabase.auth.signOut();
+                             return;
+                        }
+                        (window as any).sessionRegistered = true;
+                    }
+
+                    // Ping via GET to check validity without re-registering
+                    const res = await apiFetch(`/api/vendor/${user.id}/sessions`);
+                    
+                    if (res.status === 403) {
+                         console.error("Device limit reached.");
+                         if (supabase) await supabase.auth.signOut();
+                         return;
+                    }
+                    
+                    const data = await res.json();
+                    if (data.success && data.sessions) {
+                        const isValid = data.sessions.some((s: any) => s.id === currentSessionId);
+                        if (!isValid) {
+                            console.error("Session revoked by server.");
+                            if (supabase) await supabase.auth.signOut();
+                        }
+                    }
+                } catch (err) {
+                    console.error("Session check failed", err);
                 }
+            };
+            
+            checkSession();
+            // Optional: run periodically
+            const interval = setInterval(checkSession, 15000); 
+            return () => clearInterval(interval);
+        }
+    }, [user?.id]);
 
-                if (data && data.length > 0 && !error) {
-                    let vendor = mapVendorFromDb(data[0]);
+    const fetchVendorProfile = async (userIdOrEmail: string, forceRefresh = false): Promise<Vendor | null> => {
+        try {
+            let vendor = await getVendorProfile(userIdOrEmail, forceRefresh);
 
-                    // Check for scheduled downgrade enforcement
-                    if (vendor.downgradeEffectiveDate && new Date(vendor.downgradeEffectiveDate) <= new Date()) {
-                        console.log(`Enforcing downgrade for vendor ${vendor.id} to ${vendor.scheduledDowngrade}`);
-                        try {
-                            // Update vendor in database
+            // Fallback attempt with session user email or ID if first lookup missed
+            if (!vendor && session?.user) {
+                const altIdentifier = userIdOrEmail === session.user.id ? session.user.email : session.user.id;
+                if (altIdentifier && altIdentifier !== userIdOrEmail) {
+                    vendor = await getVendorProfile(altIdentifier, forceRefresh);
+                }
+            }
+
+            if (vendor) {
+                // Check for scheduled downgrade enforcement
+                if (vendor.downgradeEffectiveDate && new Date(vendor.downgradeEffectiveDate) <= new Date()) {
+                    try {
+                        if (supabase) {
                             await (supabase.from('vendors') as any)
                                 .update({
                                     subscription: vendor.scheduledDowngrade,
@@ -63,31 +118,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                     billing_period_end: null
                                 })
                                 .eq('id', vendor.id);
-
-                            fetch('/api/vendor/apply-downgrade', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ vendorId: vendor.id, targetPlan: vendor.scheduledDowngrade, currentPlan: vendor.subscription })
-                            }).catch(() => {});
-                            
-                            if (vendor.scheduledDowngrade) {
-                                vendor.subscription = vendor.scheduledDowngrade;
-                            }
-                            vendor.scheduledDowngrade = null;
-                            vendor.downgradeEffectiveDate = null;
-                            vendor.billingPeriodEnd = null;
-                        } catch (err) {
-                            console.error("Failed to enforce downgrade:", err);
                         }
+                        apiFetch('/api/vendor/apply-downgrade', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ vendorId: vendor.id, targetPlan: vendor.scheduledDowngrade, currentPlan: vendor.subscription })
+                        }).catch(() => {});
+                        
+                        if (vendor.scheduledDowngrade) {
+                            vendor.subscription = vendor.scheduledDowngrade;
+                        }
+                        vendor.scheduledDowngrade = null;
+                        vendor.downgradeEffectiveDate = null;
+                        vendor.billingPeriodEnd = null;
+                    } catch (err) {
+                        console.error("Failed to enforce downgrade:", err);
                     }
-
-                    setUser(vendor);
-                    localStorage.setItem('vendor_user', JSON.stringify(vendor));
-                    return vendor;
                 }
-            } catch (err) {
-                console.error("Supabase load user profile error:", err);
+
+                setUser(vendor);
+                setIsAdmin(false);
+                localStorage.removeItem('vendor_admin');
+                localStorage.setItem('vendor_user', JSON.stringify(vendor));
+                return vendor;
+            } else {
+                console.warn(`[fetchVendorProfile] Vendor record NOT found for identifier: "${userIdOrEmail}"`);
             }
+        } catch (err) {
+            console.error("Supabase load user profile error:", err);
         }
         return null;
     };
@@ -97,19 +155,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             supabase.auth.getSession().then(({ data: { session } }) => {
                 setSession(session);
                 if (session?.user) {
+                    setIsAdmin(session.user.user_metadata?.role === 'admin' || session.user.user_metadata?.role === 'superadmin');
                     setIsSuperAdmin(session.user.user_metadata?.role === 'superadmin');
-                    fetchVendorProfile(session.user.id).finally(() => {
+                    fetchVendorProfile(session.user.email || session.user.id).finally(() => {
                         setLoading(false);
                     });
                 } else {
-                    const storedUser = localStorage.getItem('vendor_user');
-                    if (storedUser) {
-                        try {
-                            setUser(JSON.parse(storedUser));
-                        } catch (e) {
-                            console.error("Failed to parse stored vendor user", e);
-                        }
-                    }
+                    // Purge stale local storage and clear state when Supabase reports no session
+                    localStorage.removeItem('vendor_user');
+                    localStorage.removeItem('vendor_admin');
+                    setUser(null);
+                    setIsAdmin(false);
+                    setIsSuperAdmin(false);
                     setLoading(false);
                 }
             });
@@ -117,22 +174,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
                 setSession(newSession);
                 if (newSession?.user) {
+                    setIsAdmin(newSession.user.user_metadata?.role === 'admin' || newSession.user.user_metadata?.role === 'superadmin');
                     setIsSuperAdmin(newSession.user.user_metadata?.role === 'superadmin');
-                    await fetchVendorProfile(newSession.user.id);
+                    await fetchVendorProfile(newSession.user.email || newSession.user.id);
                 } else {
+                    // Immediately purge local storage and reset state when newSession is null/undefined or on SIGNED_OUT
+                    localStorage.removeItem('vendor_user');
+                    localStorage.removeItem('vendor_admin');
+                    setUser(null);
+                    setIsAdmin(false);
                     setIsSuperAdmin(false);
-                    const hasMockUser = localStorage.getItem('vendor_user');
-                    if (!hasMockUser) {
-                        setUser(null);
-                    }
                 }
                 setLoading(false);
             });
-
-            const storedAdmin = localStorage.getItem('vendor_admin');
-            if (storedAdmin === 'true') {
-                setIsAdmin(true);
-            }
 
             return () => {
                 subscription.unsubscribe();
@@ -155,26 +209,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const loginWithEmail = async (email: string) => {
-        if (!supabase) throw new Error("Supabase not initialized");
-        // Phase 2: replace/augment with WhatsApp OTP via MSG91
-        // when Meta WhatsApp Business API approval is complete
-        
-        // IMPORTANT: To receive a 6-digit numeric OTP instead of a Magic Link:
-        // 1. Go to Supabase Dashboard -> Authentication -> Providers -> Email
-        // 2. Ensure "Enable Email OTP" is toggled ON
-        // 3. Toggle "Confirm Email" to OFF (this ensures codes are sent for verification)
-        // 4. Ensure the Email Template for "OTP" uses {{ .Token }}
-        const { error } = await supabase.auth.signInWithOtp({ 
-            email,
-            options: {
-                shouldCreateUser: true
-                // We explicitly omit emailRedirectTo to favor the numeric OTP code delivery
+        if (!supabase) return;
+        try {
+            const { error } = await supabase.auth.signInWithOtp({ 
+                email,
+                options: {
+                    shouldCreateUser: true
+                }
+            });
+            if (error) {
+                console.warn("Supabase OTP notice (Test mode default OTP 123456 active):", error.message);
             }
-        });
-        if (error) throw error;
+        } catch (err) {
+            console.warn("Supabase OTP error (Test mode default OTP 123456 active):", err);
+        }
     };
 
     const verifyOtp = async (email: string, token: string): Promise<Vendor> => {
+        // Test Mode: Accept default OTP '123456' for vendor demo
+        if (token === '123456') {
+            if (supabase) {
+                try {
+                    const profile = await fetchVendorProfile(email);
+                    if (profile) return profile;
+                } catch (e) {
+                    console.warn("Fetch vendor profile error during default OTP verification:", e);
+                }
+            }
+
+            const mockV = mockDb.vendors.find(v => v.email?.toLowerCase() === email.toLowerCase() || v.id === email);
+            if (mockV) {
+                setUser(mockV);
+                localStorage.setItem('vendor_user', JSON.stringify(mockV));
+                return mockV;
+            }
+
+            throw new Error("Vendor profile not found. Please register.");
+        }
+
         if (!supabase) throw new Error("Supabase not initialized");
         const { data, error } = await supabase.auth.verifyOtp({
             email,
@@ -185,7 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) throw error;
         if (!data.user) throw new Error("No user returned");
 
-        const profile = await fetchVendorProfile(data.user.id);
+        const profile = await fetchVendorProfile(data.user.email || data.user.id);
         if (!profile) {
             throw new Error("Vendor profile not found. Please register.");
         }
@@ -199,15 +271,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (supabase) {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user) {
-                const profile = await fetchVendorProfile(session.user.id);
+                const profile = await fetchVendorProfile(session.user.email || session.user.id);
                 if (profile) return profile;
+            }
+            // Fallback for demo accounts or offline testing
+            const mockV = mockDb.vendors.find(v => v.email?.toLowerCase() === email.toLowerCase() || v.id === email);
+            if (mockV) {
+                setUser(mockV);
+                localStorage.setItem('vendor_user', JSON.stringify(mockV));
+                return mockV;
             }
             throw new Error("Authentication required via OTP.");
         }
 
-        const vendor = mockDb.vendors.find(v => v.email.toLowerCase() === email.toLowerCase());
+        const vendor = mockDb.vendors.find(v => v.email?.toLowerCase() === email.toLowerCase() || v.id === email);
         if (vendor) {
             setUser(vendor);
+            setIsAdmin(false);
+            localStorage.removeItem('vendor_admin');
             localStorage.setItem('vendor_user', JSON.stringify(vendor));
             return vendor;
         }
@@ -243,11 +324,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('vendor_admin', 'true');
     };
 
-    const updateUser = (updates: Partial<Vendor>) => {
-        if (!user) return;
-        const updated = { ...user, ...updates };
-        setUser(updated);
+    const updateUser = (updates: Partial<Vendor> | Vendor) => {
+        const updated = user ? { ...user, ...updates } : (updates as Vendor);
+        setUser(updated as Vendor);
         localStorage.setItem('vendor_user', JSON.stringify(updated));
+        const mockV = mockDb.vendors.find(v => v.id === updated.id);
+        if (mockV) {
+            Object.assign(mockV, updated);
+        }
     };
 
     const updatePlan = (newPlan: Vendor['subscription']) => {
@@ -288,9 +372,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const refreshProfile = async () => {
         if (supabase) {
-            const userId = session?.user?.id || user?.id;
+            let userId = session?.user?.id || user?.id;
+            if (!userId) {
+                const { data } = await supabase.auth.getSession();
+                userId = data.session?.user?.id;
+            }
             if (userId) {
-                const profile = await fetchVendorProfile(userId);
+                const profile = await fetchVendorProfile(userId, true);
                 if (profile) {
                     setUser(profile);
                     localStorage.setItem('vendor_user', JSON.stringify(profile));

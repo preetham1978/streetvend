@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch';
 import React, { useState } from 'react';
 import { 
     Store, 
@@ -80,7 +81,7 @@ STRICT REQUIREMENT:
 2. Include WhatsApp formatting like *bold text* and relevant emojis.
 3. Keep it punchy, engaging, and under 120 words.`;
 
-            const res = await fetch('/api/chat', {
+            const res = await apiFetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ prompt, language: 'en' })

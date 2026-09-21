@@ -7,13 +7,18 @@ export interface Vendor {
     email?: string;
     category: string;
     subscription: 'free' | 'starter' | 'growth' | 'professional' | 'enterprise';
-    scheduledDowngrade?: 'free' | 'starter' | 'growth' | 'professional' | null;
+    scheduledDowngrade?: 'free' | 'starter' | 'growth' | 'professional' | 'enterprise' | null;
     downgradeEffectiveDate?: string | null;
     billingPeriodEnd?: string | null;
     isActive: boolean;
     qrCodeUrl: string | null;
+    upiId?: string | null;
     language: 'en' | 'hi' | 'ta' | 'kn';
     createdAt: string;
+    gstin?: string;
+    pan?: string;
+    hsnCode?: string;
+    address?: string;
 }
 
 export interface Product {
@@ -34,6 +39,8 @@ export interface OrderItem {
     name: string;
     price: number;
     quantity: number;
+    unit?: string;
+    specs?: string;
 }
 
 export interface Order {
@@ -42,7 +49,22 @@ export interface Order {
     items: OrderItem[];
     total: number;
     paymentMethod: 'cash' | 'upi' | 'card';
+    paymentStatus?: 'pending' | 'confirmed';
     createdAt: string;
+    customerName?: string;
+    customerPhone?: string;
+    customerAddress?: string;
+    customerGstin?: string;
+    ewayBillNo?: string;
+    vehicleNo?: string;
+    taxableAmount?: number;
+    cgst?: number;
+    sgst?: number;
+    igst?: number;
+    woodSpecs?: string;
+    isArchived?: boolean;
+    archivedAt?: string;
+    archivedBy?: string;
 }
 
 export interface Payment {

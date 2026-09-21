@@ -1,6 +1,8 @@
+import { apiFetch } from '../lib/apiFetch';
 import React, { useState, useEffect } from 'react';
 import { Laptop, Smartphone, Tablet, X, ShieldAlert, Monitor, CheckCircle, Trash2 } from 'lucide-react';
 import { usePlanLimits } from '../hooks/usePlanLimits';
+import { useAuth } from '../lib/auth';
 import UpgradeModal from './UpgradeModal';
 
 export interface DeviceSession {
@@ -20,44 +22,48 @@ export default function DeviceSessionManager({
     onClose: () => void;
 }) {
     const { config, currentPlan } = usePlanLimits();
+    const { user } = useAuth();
     const maxDevices = config.maxDevices;
 
-    const [sessions, setSessions] = useState<DeviceSession[]>([
-        {
-            id: 's1',
-            deviceName: 'Chrome on Mac (This Browser)',
-            deviceType: 'desktop',
-            location: 'Bengaluru, KA',
-            lastActive: 'Active Now',
-            isCurrent: true
-        },
-        {
-            id: 's2',
-            deviceName: 'Samsung Galaxy Tab (Billing POS)',
-            deviceType: 'tablet',
-            location: 'Indiranagar Stall',
-            lastActive: '12 mins ago',
-            isCurrent: false
-        },
-        {
-            id: 's3',
-            deviceName: 'Redmi Note 12 (Vendor App)',
-            deviceType: 'mobile',
-            location: 'MG Road Counter',
-            lastActive: '1 hour ago',
-            isCurrent: false
-        },
-        {
-            id: 's4',
-            deviceName: 'iPad Air (Secondary Counter)',
-            deviceType: 'tablet',
-            location: 'Koramangala Stall',
-            lastActive: '3 hours ago',
-            isCurrent: false
-        }
-    ]);
-
+    const [sessions, setSessions] = useState<DeviceSession[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+    // Fetch and sync sessions from server
+    useEffect(() => {
+        if (isOpen && user?.id) {
+            setIsLoading(true);
+            const currentSessionId = localStorage.getItem('device_session_id') || ('s_' + Math.random().toString(36).substring(2, 9));
+            localStorage.setItem('device_session_id', currentSessionId);
+
+            const isMobile = /iphone|ipad|ipod|android|mobile/.test(navigator.userAgent.toLowerCase());
+            const deviceName = isMobile ? 'Mobile Browser (This Device)' : 'Chrome on Desktop (This Browser)';
+            const deviceType = isMobile ? 'mobile' : 'desktop';
+
+            apiFetch(`/api/vendor/${user.id}/sessions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId: currentSessionId,
+                    deviceName,
+                    deviceType,
+                    location: 'India'
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.sessions) {
+                    const mapped = data.sessions.map((s: any) => ({
+                        ...s,
+                        isCurrent: s.id === currentSessionId
+                    }));
+                    setSessions(mapped);
+                }
+            })
+            .catch(err => console.error("Failed to sync sessions:", err))
+            .finally(() => setIsLoading(false));
+        }
+    }, [isOpen, user?.id]);
 
     // Escape Key Listener
     useEffect(() => {
@@ -76,12 +82,27 @@ export default function DeviceSessionManager({
 
     if (!isOpen) return null;
 
-    // Filter active sessions to match max device limit rule or show limit warning
     const activeSessionCount = sessions.length;
     const isExceedingLimit = activeSessionCount > maxDevices;
 
-    const revokeSession = (id: string) => {
-        setSessions(prev => prev.filter(s => s.id !== id));
+    const revokeSession = async (id: string) => {
+        if (!user?.id) return;
+        try {
+            const res = await apiFetch(`/api/vendor/${user.id}/sessions/${id}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            if (data.success && data.sessions) {
+                const currentSessionId = localStorage.getItem('device_session_id');
+                const mapped = data.sessions.map((s: any) => ({
+                    ...s,
+                    isCurrent: s.id === currentSessionId
+                }));
+                setSessions(mapped);
+            }
+        } catch (err) {
+            console.error("Failed to revoke session:", err);
+        }
     };
 
     const getDeviceIcon = (type: DeviceSession['deviceType']) => {
@@ -164,45 +185,51 @@ export default function DeviceSessionManager({
 
                 {/* Session List */}
                 <div className="space-y-4 max-h-64 overflow-y-auto pr-1 mb-6 custom-scrollbar">
-                    {sessions.map((s) => (
-                        <div
-                            key={s.id}
-                            className={`p-4 rounded-2xl border flex items-center justify-between transition-all gap-4 ${
-                                s.isCurrent
-                                    ? 'bg-brand-500/10 border-brand-500/30'
-                                    : 'bg-bg-surface-inset border-border-subtle hover:border-brand-500/20'
-                            }`}
-                        >
-                            <div className="flex items-center gap-3.5 min-w-0">
-                                <div className="p-3 rounded-xl bg-bg-surface-inset shrink-0 flex items-center justify-center">
-                                    {getDeviceIcon(s.deviceType)}
-                                </div>
-                                <div className="min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <h3 className="font-bold text-sm text-text-primary leading-snug truncate">{s.deviceName}</h3>
-                                        {s.isCurrent && (
-                                            <span className="px-2 py-0.5 rounded-full bg-accent-green/10 text-accent-green text-[9px] font-extrabold uppercase tracking-wider shrink-0">
-                                                This Device
-                                            </span>
-                                        )}
+                    {isLoading ? (
+                        <div className="text-center py-6 text-xs text-text-tertiary">Loading active sessions...</div>
+                    ) : sessions.length === 0 ? (
+                        <div className="text-center py-6 text-xs text-text-tertiary">No active sessions found.</div>
+                    ) : (
+                        sessions.map((s) => (
+                            <div
+                                key={s.id}
+                                className={`p-4 rounded-2xl border flex items-center justify-between transition-all gap-4 ${
+                                    s.isCurrent
+                                        ? 'bg-brand-500/10 border-brand-500/30'
+                                        : 'bg-bg-surface-inset border-border-subtle hover:border-brand-500/20'
+                                }`}
+                            >
+                                <div className="flex items-center gap-3.5 min-w-0">
+                                    <div className="p-3 rounded-xl bg-bg-surface-inset shrink-0 flex items-center justify-center">
+                                        {getDeviceIcon(s.deviceType)}
                                     </div>
-                                    <p className="text-xs text-text-tertiary mt-1 leading-normal truncate">
-                                        {s.location} · {s.lastActive}
-                                    </p>
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <h3 className="font-bold text-sm text-text-primary leading-snug truncate">{s.deviceName}</h3>
+                                            {s.isCurrent && (
+                                                <span className="px-2 py-0.5 rounded-full bg-accent-green/10 text-accent-green text-[9px] font-extrabold uppercase tracking-wider shrink-0">
+                                                    This Device
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-text-tertiary mt-1 leading-normal truncate">
+                                            {s.location} · {s.lastActive}
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
 
-                            {!s.isCurrent && (
-                                <button
-                                    onClick={() => revokeSession(s.id)}
-                                    className="p-2.5 rounded-xl text-text-tertiary hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer shrink-0"
-                                    title="Revoke session"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            )}
-                        </div>
-                    ))}
+                                {!s.isCurrent && (
+                                    <button
+                                        onClick={() => revokeSession(s.id)}
+                                        className="p-2.5 rounded-xl text-text-tertiary hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer shrink-0"
+                                        title="Revoke session"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
+                        ))
+                    )}
                 </div>
 
                 {/* Bottom Actions Footer */}

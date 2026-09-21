@@ -1,5 +1,9 @@
--- StreetVend Admin Analytics Migration
--- Run this in your Supabase SQL Editor to set up the necessary views and functions.
+-- StreetVend Admin Analytics & Schema Migration
+-- Run this in your Supabase SQL Editor to set up the necessary tables, columns, views, and functions.
+
+-- Ensure necessary vendor table columns exist
+ALTER TABLE vendors ADD COLUMN IF NOT EXISTS upi_id TEXT;
+ALTER TABLE vendors ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
 
 -- 1. View: admin_platform_summary
 CREATE OR REPLACE VIEW admin_platform_summary AS
@@ -152,10 +156,15 @@ ALTER TABLE vendors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE admin_audit_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 
 -- 1. Vendors Policies
 CREATE POLICY "Vendors can view their own record" ON vendors
-    FOR SELECT USING (auth.uid() = id);
+    FOR SELECT USING (auth.uid() = id OR auth.uid() = user_id);
+
+CREATE POLICY "Vendors can update their own record" ON vendors
+    FOR UPDATE USING (auth.uid() = id OR auth.uid() = user_id)
+    WITH CHECK (auth.uid() = id OR auth.uid() = user_id);
 
 CREATE POLICY "Admins can view all vendors" ON vendors
     FOR SELECT USING (auth.jwt() -> 'user_metadata' ->> 'role' IN ('admin', 'superadmin'));
@@ -163,21 +172,55 @@ CREATE POLICY "Admins can view all vendors" ON vendors
 CREATE POLICY "Admins can update all vendors" ON vendors
     FOR UPDATE USING (auth.jwt() -> 'user_metadata' ->> 'role' IN ('admin', 'superadmin'));
 
+-- Note: Vendor self-registration is intentionally handled server-side via /api/register-vendor
+-- using the Supabase Service Role key. Direct client-side INSERT to vendors is blocked by default.
+
 -- 2. Orders Policies
 CREATE POLICY "Vendors can view their own orders" ON orders
-    FOR SELECT USING (auth.uid() = vendor_id);
+    FOR SELECT USING (auth.uid() = vendor_id OR vendor_id IN (SELECT id FROM vendors WHERE user_id = auth.uid()));
+
+CREATE POLICY "Vendors can insert their own orders" ON orders
+    FOR INSERT WITH CHECK (
+        auth.uid() = vendor_id 
+        OR vendor_id IN (SELECT id FROM vendors WHERE user_id = auth.uid())
+    );
+
+CREATE POLICY "Vendors can update their own orders" ON orders
+    FOR UPDATE USING (
+        auth.uid() = vendor_id OR vendor_id IN (SELECT id FROM vendors WHERE user_id = auth.uid())
+    )
+    WITH CHECK (
+        auth.uid() = vendor_id OR vendor_id IN (SELECT id FROM vendors WHERE user_id = auth.uid())
+    );
+
+CREATE POLICY "Vendors can delete their own orders" ON orders
+    FOR DELETE USING (
+        auth.uid() = vendor_id OR vendor_id IN (SELECT id FROM vendors WHERE user_id = auth.uid())
+    );
 
 CREATE POLICY "Admins can view all orders" ON orders
     FOR SELECT USING (auth.jwt() -> 'user_metadata' ->> 'role' IN ('admin', 'superadmin'));
 
 -- 3. Products Policies
 CREATE POLICY "Vendors can manage their own products" ON products
-    FOR ALL USING (auth.uid() = vendor_id);
+    FOR ALL 
+    USING (auth.uid() = vendor_id OR vendor_id IN (SELECT id FROM vendors WHERE user_id = auth.uid()))
+    WITH CHECK (auth.uid() = vendor_id OR vendor_id IN (SELECT id FROM vendors WHERE user_id = auth.uid()));
 
 CREATE POLICY "Admins can view all products" ON products
     FOR SELECT USING (auth.jwt() -> 'user_metadata' ->> 'role' IN ('admin', 'superadmin'));
 
--- 4. Audit Log Policies
+-- 4. Payments Policies
+CREATE POLICY "Vendors can view their own payments" ON payments
+    FOR SELECT USING (auth.uid() = vendor_id OR vendor_id IN (SELECT id FROM vendors WHERE user_id = auth.uid()));
+
+CREATE POLICY "Vendors can insert their own payments" ON payments
+    FOR INSERT WITH CHECK (auth.uid() = vendor_id OR vendor_id IN (SELECT id FROM vendors WHERE user_id = auth.uid()));
+
+CREATE POLICY "Admins can view all payments" ON payments
+    FOR SELECT USING (auth.jwt() -> 'user_metadata' ->> 'role' IN ('admin', 'superadmin'));
+
+-- 5. Audit Log Policies
 CREATE POLICY "Only admins can view audit logs" ON admin_audit_log
     FOR SELECT USING (auth.jwt() -> 'user_metadata' ->> 'role' IN ('admin', 'superadmin'));
 

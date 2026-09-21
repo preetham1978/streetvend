@@ -1,8 +1,9 @@
+import { apiFetch } from '../lib/apiFetch';
 import React, { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Store, Check, ArrowRight, ChevronLeft, User, Phone, Mail, MapPin, Package } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { mockDb, supabase } from '../lib/supabase';
+import { mockDb, supabase, mapVendorFromDb } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { motion, AnimatePresence } from 'motion/react';
 import { useI18n } from '../lib/I18nContext';
@@ -37,7 +38,7 @@ export default function Register() {
     }, [session]);
 
     const categories = [
-        'Street Food', 'Vegetables & Fruits', 'Meat & Seafood', 'Groceries', 
+        'Street Food', 'Timber & Wood Trading', 'Vegetables & Fruits', 'Meat & Seafood', 'Groceries', 
         'Laundry', 'Key Maker', 'Mobile Accessories', 'Watch Repair\'s', 
         'Pan Shop', 'Fancy Store', 'Stationery'
     ];
@@ -60,7 +61,7 @@ export default function Register() {
             created_at: new Date().toISOString()
         };
 
-        const res = await fetch('/api/register-vendor', {
+        const res = await apiFetch('/api/register-vendor', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newVendorDb)
@@ -121,17 +122,25 @@ export default function Register() {
 
         setIsSubmitting(true);
         try {
-            // 1. Verify OTP (creates auth session)
-            const { data, error: verifyError } = await (supabase?.auth.verifyOtp({
-                email,
-                token,
-                type: 'email'
-            }) as any);
+            let userId = session?.user?.id;
 
-            if (verifyError || !data?.user) throw verifyError || new Error("Verification failed");
+            if (token === '123456') {
+                // Default test OTP bypass for demo testing
+                userId = userId || 'usr_test_' + Math.random().toString(36).substring(2, 9);
+            } else {
+                // 1. Verify OTP with Supabase
+                const { data, error: verifyError } = await (supabase?.auth.verifyOtp({
+                    email,
+                    token,
+                    type: 'email'
+                }) as any);
 
-            // 2. Create Vendor Row with user_id = data.user.id and all collected form data
-            await createVendorRecord(data.user.id);
+                if (verifyError || !data?.user) throw verifyError || new Error("Verification failed");
+                userId = data.user.id;
+            }
+
+            // 2. Create Vendor Row with user_id and all collected form data
+            await createVendorRecord(userId);
         } catch (err: any) {
             setErrorMsg(err?.message || 'Verification or registration failed');
         } finally {
@@ -158,9 +167,7 @@ export default function Register() {
         return (
             <div className="min-h-screen flex items-center justify-center py-20 px-4 bg-bg-base relative overflow-hidden">
                 <div className="absolute inset-0 hero-glow opacity-30 pointer-events-none"></div>
-                <motion.div 
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
+                <div 
                     className="max-w-md w-full bg-bg-surface rounded-[2.5rem] p-10 border border-border-subtle shadow-2xl z-10"
                 >
                     <div className="text-center mb-8">
@@ -177,7 +184,25 @@ export default function Register() {
                         </div>
                     )}
 
-                    <form onSubmit={handleVerifyAndComplete} className="space-y-8">
+                    <form onSubmit={handleVerifyAndComplete} className="space-y-6">
+                        {/* Demo Mode Test OTP Banner */}
+                        <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs font-semibold text-amber-500 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                                <span>✨ Demo OTP:</span>
+                                <strong className="font-mono text-xs bg-amber-500 text-white px-2 py-0.5 rounded font-black tracking-widest">123456</strong>
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setOtp(['1', '2', '3', '4', '5', '6']);
+                                    setErrorMsg('');
+                                }}
+                                className="text-[10px] uppercase tracking-wider font-extrabold bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded-lg transition-colors cursor-pointer shadow-sm"
+                            >
+                                Auto-Fill 123456
+                            </button>
+                        </div>
+
                         <div className="grid grid-cols-6 gap-2">
                             {otp.map((digit, i) => (
                                 <input
@@ -209,7 +234,7 @@ export default function Register() {
                             ← Back to Form
                         </button>
                     </form>
-                </motion.div>
+                </div>
             </div>
         );
     }
@@ -219,9 +244,7 @@ export default function Register() {
             <div className="absolute inset-0 hero-glow opacity-30 pointer-events-none"></div>
             
             <div className="max-w-2xl w-full mx-auto relative z-10">
-                <motion.div 
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
+                <div 
                     className="text-center mb-12"
                 >
                     <div className="w-20 h-20 bg-brand-500/10 rounded-[1.5rem] flex items-center justify-center text-brand-500 mx-auto mb-8 border border-brand-500/20 shadow-2xl relative group">
@@ -230,32 +253,26 @@ export default function Register() {
                     </div>
                     <h1 className="text-3xl sm:text-5xl font-display font-bold text-text-primary mb-4 leading-none">Register Your Store</h1>
                     <p className="text-text-tertiary font-bold uppercase tracking-widest text-[10px]">Step {step} of 3 · Go Digital Today</p>
-                </motion.div>
+                </div>
 
                 {/* Step Indicator */}
                 <div className="flex items-center justify-center mb-16 max-w-md mx-auto relative">
                     <div className="absolute top-1/2 left-0 w-full h-px bg-border-subtle -z-10"></div>
                     {[1, 2, 3].map((num) => (
                         <div key={num} className="flex items-center bg-bg-base px-6 first:pl-0 last:pr-0">
-                            <motion.div 
-                                animate={{ 
-                                    scale: step === num ? 1.2 : 1,
-                                    backgroundColor: step >= num ? "var(--brand-500)" : "var(--bg-surface)",
-                                    borderColor: step >= num ? "var(--brand-500)" : "var(--border-subtle)"
-                                }}
+                            <div 
                                 className={cn(
                                     "w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-base border-2 transition-all shadow-xl",
-                                    step >= num ? "text-white" : "text-text-tertiary"
+                                    step >= num ? "text-white bg-brand-500 border-brand-500" : "text-text-tertiary bg-bg-surface border-border-subtle"
                                 )}
                             >
                                 {step > num ? <Check className="w-6 h-6" /> : num}
-                            </motion.div>
+                            </div>
                         </div>
                     ))}
                 </div>
 
-                <motion.div 
-                    layout
+                <div 
                     className="bg-bg-surface rounded-[2.5rem] p-8 sm:p-14 border border-border-subtle shadow-2xl relative overflow-hidden"
                 >
                     <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-brand-500/5 rounded-full blur-3xl"></div>
@@ -265,9 +282,9 @@ export default function Register() {
                             {step === 1 && (
                                 <motion.div 
                                     key="step1"
-                                    initial={{ opacity: 0, x: 20 }}
+                                    initial={{ opacity: 1, x: 10 }}
                                     animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: -20 }}
+                                    exit={{ opacity: 1, x: -10 }}
                                     className="space-y-8"
                                 >
                                     <div className="grid grid-cols-1 gap-8">
@@ -312,9 +329,9 @@ export default function Register() {
                             {step === 2 && (
                                 <motion.div 
                                     key="step2"
-                                    initial={{ opacity: 0, x: 20 }}
+                                    initial={{ opacity: 1, x: 10 }}
                                     animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: -20 }}
+                                    exit={{ opacity: 1, x: -10 }}
                                     className="space-y-8"
                                 >
                                     <div>
@@ -352,9 +369,9 @@ export default function Register() {
                             {step === 3 && (
                                 <motion.div 
                                     key="step3"
-                                    initial={{ opacity: 0, x: 20 }}
+                                    initial={{ opacity: 1, x: 10 }}
                                     animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: -20 }}
+                                    exit={{ opacity: 1, x: -10 }}
                                     className="space-y-10"
                                 >
                                     <div>
@@ -420,7 +437,7 @@ export default function Register() {
                             </button>
                         </div>
                     </form>
-                </motion.div>
+                </div>
 
                 <div className="text-center mt-12">
                     <p className="text-xs text-text-tertiary font-bold uppercase tracking-widest">

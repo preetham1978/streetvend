@@ -14,7 +14,7 @@ import {
 } from 'recharts';
 import GatedChartWrapper from './GatedChartWrapper';
 import { useAuth } from '../lib/auth';
-import { supabase } from '../lib/supabase';
+import { getVendorOrders } from '../lib/dataCache';
 import { Loader2 } from 'lucide-react';
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -37,35 +37,42 @@ export default function SalesTrendChart() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        let isMounted = true;
         async function fetchSalesData() {
-            if (!user) return;
+            if (!user?.id) return;
             setIsLoading(true);
-            const { data: orders, error } = await supabase
-                .from('orders')
-                .select('*')
-                .eq('vendor_id', user.id);
-            
-            if (error || !orders) {
-                setData([]);
-            } else {
-                // Process orders into daily trend
-                const dailyMap: Record<string, { revenue: number, orders: number }> = {};
-                (orders as any[]).forEach(o => {
-                    const date = new Date(o.created_at).toLocaleDateString('en-US', { weekday: 'short' });
-                    if (!dailyMap[date]) dailyMap[date] = { revenue: 0, orders: 0 };
-                    dailyMap[date].revenue += o.total;
-                    dailyMap[date].orders += 1;
-                });
-                const chartData = Object.entries(dailyMap).map(([day, metrics]) => ({
-                    day,
-                    ...metrics
-                }));
-                setData(chartData);
+            try {
+                const orders = await getVendorOrders(user.id);
+                if (!isMounted) return;
+                if (!orders || orders.length === 0) {
+                    setData([]);
+                } else {
+                    const dailyMap: Record<string, { revenue: number, orders: number }> = {};
+                    orders.forEach(o => {
+                        const parsedDate = o.createdAt ? new Date(o.createdAt) : null;
+                        const date = parsedDate && !isNaN(parsedDate.getTime()) 
+                            ? parsedDate.toLocaleDateString('en-US', { weekday: 'short' }) 
+                            : 'Recent';
+                        if (!dailyMap[date]) dailyMap[date] = { revenue: 0, orders: 0 };
+                        dailyMap[date].revenue += o.total || 0;
+                        dailyMap[date].orders += 1;
+                    });
+                    const chartData = Object.entries(dailyMap).map(([day, metrics]) => ({
+                        day,
+                        ...metrics
+                    }));
+                    setData(chartData);
+                }
+            } catch (err) {
+                console.error("SalesTrendChart error:", err);
+                if (isMounted) setData([]);
+            } finally {
+                if (isMounted) setIsLoading(false);
             }
-            setIsLoading(false);
         }
         fetchSalesData();
-    }, [user]);
+        return () => { isMounted = false; };
+    }, [user?.id]);
 
     if (isLoading) return <div className="h-[300px] flex items-center justify-center"><Loader2 className="animate-spin w-8 h-8 text-brand-500" /></div>;
     if (data.length === 0) return (

@@ -87,7 +87,8 @@ export default function PWAInstallPrompt() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 50, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="fixed bottom-4 left-4 right-4 md:left-auto md:right-6 md:max-w-md z-[99990] bg-bg-surface border-2 border-brand-500/40 rounded-3xl p-4 shadow-2xl backdrop-blur-xl"
+            className="fixed left-4 right-4 md:left-auto md:right-6 md:max-w-md z-[99990] bg-bg-surface border-2 border-brand-500/40 rounded-3xl p-4 shadow-2xl backdrop-blur-xl"
+            style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">

@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch';
 import React, { useState, useEffect } from 'react';
 import { Send, Sparkles, MessageCircle, Copy, Check, Users, Gift, ShieldAlert, Store, MapPin, Sliders } from 'lucide-react';
 import { usePlanLimits } from '../hooks/usePlanLimits';
@@ -169,7 +170,7 @@ STRICT STORE-CENTRIC REQUIREMENTS:
 5. Include appealing emojis, WhatsApp formatting (*bold* text), and a clear call-to-action for ${activeStoreName}.
 6. Respond in language: ${language}.`;
 
-            const res = await fetch('/api/chat', {
+            const res = await apiFetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

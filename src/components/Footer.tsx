@@ -36,7 +36,6 @@ export default function Footer() {
                             <li><Link to="/login" className="text-text-secondary hover:text-brand-500 transition-colors">Vendor Login</Link></li>
                             <li><Link to="/plans" className="text-text-secondary hover:text-brand-500 transition-colors">Pricing Plans</Link></li>
                             <li><Link to="/admin" className="text-text-secondary hover:text-brand-500 transition-colors">Admin Portal</Link></li>
-                            <li><a href="#" className="text-text-secondary hover:text-brand-500 transition-colors">Supabase DB setup (step-by-step)</a></li>
                         </ul>
                     </div>
 

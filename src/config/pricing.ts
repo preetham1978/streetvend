@@ -100,7 +100,7 @@ export const PLANS_CONFIG: Record<PlanTier, PlanConfig> = {
             'ai_daily_insights',
             'ai_sales_forecast',
             'ai_customer_intelligence',
-            'ai_voice_input'
+            'barcode_scanner'
         ],
         iconName: 'zap',
         desc: 'Advanced intelligence for multi-device operations and teams.',
@@ -111,7 +111,6 @@ export const PLANS_CONFIG: Record<PlanTier, PlanConfig> = {
             'Custom store page + QR',
             'AI Sales Forecast',
             'AI Customer Intelligence',
-            'AI Boli Mode Input',
             'Priority support'
         ]
     },
@@ -139,8 +138,8 @@ export const PLANS_CONFIG: Record<PlanTier, PlanConfig> = {
             'ai_daily_insights',
             'ai_sales_forecast',
             'ai_customer_intelligence',
-            'ai_voice_input',
-            'ai_auto_reorder'
+            'ai_auto_reorder',
+            'barcode_scanner'
         ],
         popular: true,
         iconName: 'rocket',
@@ -152,7 +151,7 @@ export const PLANS_CONFIG: Record<PlanTier, PlanConfig> = {
             'Custom store page + QR',
             'AI Customer Intelligence',
             'AI Auto-Reorder',
-            'AI Sales Forecast & Boli Mode',
+            'AI Sales Forecast',
             'Priority support'
         ]
     },
@@ -183,9 +182,9 @@ export const PLANS_CONFIG: Record<PlanTier, PlanConfig> = {
             'ai_daily_insights',
             'ai_sales_forecast',
             'ai_customer_intelligence',
-            'ai_voice_input',
             'ai_auto_reorder',
-            'ai_marketing_messages'
+            'ai_marketing_messages',
+            'barcode_scanner'
         ],
         iconName: 'crown',
         desc: 'Full-scale inventory and marketing automation for franchises (4+ outlets).',

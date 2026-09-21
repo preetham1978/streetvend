@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Lock, Check, Crown, Flame, Zap, ShieldCheck } from 'lucide-react';
 import { usePlanLimits, PlanTier, TIER_CONFIGS } from '../hooks/usePlanLimits';
+import { useNavigate } from 'react-router-dom';
 
 interface UpgradeModalProps {
     isOpen: boolean;
@@ -17,13 +18,14 @@ export default function UpgradeModal({
     requiredTier = 'starter',
     message
 }: UpgradeModalProps) {
-    const { currentPlan, updatePlan } = usePlanLimits();
+    const { currentPlan } = usePlanLimits();
+    const navigate = useNavigate();
 
     if (!isOpen) return null;
 
-    const handleUpgrade = (tier: PlanTier) => {
-        updatePlan(tier);
+    const handleUpgrade = (_tier: PlanTier) => {
         onClose();
+        navigate('/plans');
     };
 
     const targetConfig = TIER_CONFIGS[requiredTier] || TIER_CONFIGS.starter;

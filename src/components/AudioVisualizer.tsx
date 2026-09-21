@@ -5,7 +5,7 @@ export function AudioVisualizer({ isRecording, color = '#EAB308' }: { isRecordin
     const streamRef = useRef<MediaStream | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
-    const animationFrameRef = useRef<number>();
+    const animationFrameRef = useRef<number | null>(null);
 
     useEffect(() => {
         if (isRecording) {

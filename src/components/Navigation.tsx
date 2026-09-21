@@ -160,15 +160,6 @@ export default function Navigation() {
             link: '/products'
         },
         {
-            id: 'n3',
-            title: 'Boli Voice Bill Processed',
-            message: '1 offline bill recorded using Boli Mode speech input.',
-            time: '1h ago',
-            type: 'voice',
-            read: false,
-            link: '/cart'
-        },
-        {
             id: 'n4',
             title: 'Peak Hour AI Prediction',
             message: 'Expect 40% higher demand for Snacks between 5 PM - 8 PM.',
@@ -180,7 +171,7 @@ export default function Navigation() {
     ]);
 
     useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
+        function handleClickOutside(event: any) {
             const target = event.target as Node;
             if ((target as HTMLElement)?.closest?.('[data-dropdown-portal]')) {
                 return;
@@ -230,17 +221,19 @@ export default function Navigation() {
         { code: 'hi', label: 'हिंदी (Hindi)' },
         { code: 'ta', label: 'தமிழ் (Tamil)' },
         { code: 'kn', label: 'ಕನ್ನಡ (Kannada)' },
+        { code: 'te', label: 'తెలుగు (Telugu)' },
+        { code: 'mr', label: 'मराठी (Marathi)' },
     ];
 
     return (
         <>
-            <nav className="sticky top-0 z-50 w-full border-b border-border-subtle bg-bg-base/80 backdrop-blur-xl overflow-visible">
-            <div className="max-w-7xl mx-auto px-4">
-                <div className="flex items-center w-full min-h-[5rem] gap-2 overflow-visible box-border">
+            <nav className="sticky top-0 z-50 w-full border-b border-border-subtle bg-bg-base/90 backdrop-blur-xl overflow-visible pt-[env(safe-area-inset-top,0px)] px-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]">
+            <div className="max-w-7xl mx-auto px-3 sm:px-4">
+                <div className="flex items-center justify-between w-full h-16 sm:h-20 gap-2">
                     {/* Left: Logo Area */}
                     <div className="flex-shrink-0 whitespace-nowrap">
                         <Link to="/" className="flex items-center gap-2 group shrink-0 whitespace-nowrap">
-                            <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center text-white shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform shrink-0 overflow-hidden">
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-brand-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform shrink-0 overflow-hidden">
                                 <img src="/favicon.png" alt="Streetvend Logo" className="w-full h-full object-cover shrink-0" />
                             </div>
                             <div className="flex flex-col whitespace-nowrap shrink-0">
@@ -248,7 +241,7 @@ export default function Navigation() {
                                     <span className="hidden min-[1201px]:inline font-display font-bold text-base text-text-primary">Velo</span>
                                     <span className="hidden min-[1201px]:inline font-display font-bold text-base text-brand-500">AI's</span>
                                     <span className="hidden min-[1201px]:inline font-display font-bold text-base text-brand-500">-</span>
-                                    <span className="font-display font-bold text-base text-brand-500">Streetvend</span>
+                                    <span className="font-display font-bold text-sm sm:text-base text-brand-500">Streetvend</span>
                                 </div>
                                 <span className="hidden min-[1501px]:block text-[10px] text-text-secondary font-bold tracking-widest uppercase truncate whitespace-nowrap">
                                     Intelligence for modern vendors
@@ -260,70 +253,73 @@ export default function Navigation() {
                     {/* Center: Flex Spacer */}
                     <div className="flex-1" />
 
-                    {/* Right: Actions Cluster */}
-                    <div className="flex-shrink-0 flex items-center gap-1.5 sm:gap-2 min-w-fit overflow-visible">
-                        {/* High Frequency Icon-Only Nav Actions (Always Visible 4-Item Cluster: Dashboard, Products, Cart, Account) */}
-                        <div className="flex items-center gap-1 sm:gap-1.5 mr-1 pr-1 sm:mr-2 sm:pr-2 border-r border-border-subtle">
+                    {/* Right: Mobile-First Primary Actions Cluster */}
+                    <div className="flex-shrink-0 flex items-center gap-2 min-w-fit overflow-visible">
+                        {/* High-Frequency Primary Action: New Bill / Cart (Visible Directly on All Mobile Screens) */}
+                        <Link 
+                            to="/cart" 
+                            title={t('nav.cart')}
+                            className={cn(
+                                "min-w-[48px] min-h-[48px] px-3.5 py-2.5 rounded-2xl flex items-center justify-center gap-2 transition-all shrink-0 font-bold text-xs active:scale-95 shadow-md",
+                                location.pathname === '/cart' 
+                                    ? "bg-brand-500 text-white shadow-brand-500/30" 
+                                    : "bg-brand-500/10 text-brand-500 hover:bg-brand-500 hover:text-white border border-brand-500/20"
+                            )}
+                        >
+                            <ShoppingCart className="w-5 h-5 shrink-0" />
+                            <span className="font-extrabold text-xs uppercase tracking-wider hidden xs:inline">New Bill</span>
+                        </Link>
+
+                        {/* Secondary Desktop Quick Icons (Dashboard, Products, Account, Theme) */}
+                        <div className="hidden md:flex items-center gap-1.5 pl-2 border-l border-border-subtle">
                             <Link 
                                 to="/dashboard" 
                                 title={t('nav.dashboard')}
                                 className={cn(
-                                    "w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0",
+                                    "min-w-[48px] min-h-[48px] rounded-2xl flex items-center justify-center transition-all shrink-0",
                                     location.pathname === '/dashboard' 
                                         ? "bg-brand-500 text-white shadow-md shadow-brand-500/20" 
                                         : "text-text-secondary hover:text-text-primary hover:bg-white/5"
                                 )}
                             >
-                                <PieChart className="w-4 h-4 shrink-0" />
+                                <PieChart className="w-5 h-5 shrink-0" />
                             </Link>
                             <Link 
                                 to="/products" 
                                 title={t('nav.products')}
                                 className={cn(
-                                    "w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0",
+                                    "min-w-[48px] min-h-[48px] rounded-2xl flex items-center justify-center transition-all shrink-0",
                                     location.pathname === '/products' 
                                         ? "bg-brand-500 text-white shadow-md shadow-brand-500/20" 
                                         : "text-text-secondary hover:text-text-primary hover:bg-white/5"
                                 )}
                             >
-                                <Package className="w-4 h-4 shrink-0" />
-                            </Link>
-                            <Link 
-                                to="/cart" 
-                                title={t('nav.cart')}
-                                className={cn(
-                                    "w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0",
-                                    location.pathname === '/cart' 
-                                        ? "bg-brand-500 text-white shadow-md shadow-brand-500/20" 
-                                        : "text-text-secondary hover:text-text-primary hover:bg-white/5"
-                                )}
-                            >
-                                <ShoppingCart className="w-4 h-4 shrink-0" />
+                                <Package className="w-5 h-5 shrink-0" />
                             </Link>
 
-                            {/* Account Dropdown Button (4th item in always-visible cluster) */}
+                            {/* Account Dropdown Button */}
                             <div className="relative shrink-0" ref={accountRef}>
                                 <button
                                     type="button"
                                     onClick={() => setIsAccountOpen(!isAccountOpen)}
                                     title="Account & Portal Access"
                                     className={cn(
-                                        "w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0",
+                                        "min-w-[48px] min-h-[48px] rounded-2xl flex items-center justify-center transition-all shrink-0",
                                         isAccountOpen || user
                                             ? "bg-brand-500/10 text-brand-500 border border-brand-500/30"
                                             : "text-text-secondary hover:text-text-primary hover:bg-white/5 border border-border-subtle"
                                     )}
                                 >
                                     {user ? (
-                                        <div className="w-5 h-5 rounded-full bg-brand-600 text-white text-[10px] font-bold flex items-center justify-center">
+                                        <div className="w-6 h-6 rounded-full bg-brand-600 text-white text-[11px] font-bold flex items-center justify-center">
                                             {user.storeName.charAt(0)}
                                         </div>
                                     ) : isAdmin ? (
-                                        <div className="w-5 h-5 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center">
+                                        <div className="w-6 h-6 rounded-full bg-red-600 text-white text-[11px] font-bold flex items-center justify-center">
                                             A
                                         </div>
                                     ) : (
-                                        <User className="w-4 h-4 shrink-0" />
+                                        <User className="w-5 h-5 shrink-0" />
                                     )}
                                 </button>
 
@@ -358,7 +354,6 @@ export default function Navigation() {
                                                         <button
                                                             type="button"
                                                             onClick={async () => {
-                                                                console.log('[LOGOUT CLICKED] Vendor Logout');
                                                                 await logout();
                                                                 setIsAccountOpen(false);
                                                                 navigate('/login');
@@ -391,7 +386,6 @@ export default function Navigation() {
                                                         <button
                                                             type="button"
                                                             onClick={async () => {
-                                                                console.log('[LOGOUT CLICKED] Admin Logout');
                                                                 await logout();
                                                                 setIsAccountOpen(false);
                                                                 navigate('/login');
@@ -454,7 +448,7 @@ export default function Navigation() {
                             onClick={toggleTheme}
                             title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
                             aria-label="Toggle theme"
-                            className="flex w-9 h-9 rounded-full bg-bg-surface border border-border-subtle text-text-secondary hover:text-text-primary hover:border-brand-500/30 transition-all cursor-pointer shadow-sm shrink-0 items-center justify-center"
+                            className="hidden sm:flex min-w-[44px] min-h-[44px] rounded-full bg-bg-surface border border-border-subtle text-text-secondary hover:text-text-primary hover:border-brand-500/30 transition-all cursor-pointer shadow-sm shrink-0 items-center justify-center"
                         >
                             {theme === 'dark' ? (
                                 <Sun className="w-4 h-4 text-amber-400 fill-amber-400/20" />
@@ -495,10 +489,10 @@ export default function Navigation() {
                         ) : user ? (
                             <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
                                 {/* Functional Notification Drawer */}
-                                <div className="relative shrink-0" ref={notifRef}>
+                                <div className="relative shrink-0 hidden sm:block" ref={notifRef}>
                                     <button 
                                         onClick={() => setIsNotifOpen(!isNotifOpen)}
-                                        className="w-9 h-9 rounded-full bg-bg-surface border border-border-subtle text-text-secondary hover:text-text-primary transition-all relative flex items-center justify-center shrink-0"
+                                        className="min-w-[44px] min-h-[44px] rounded-full bg-bg-surface border border-border-subtle text-text-secondary hover:text-text-primary transition-all relative flex items-center justify-center shrink-0"
                                         title="Notifications"
                                     >
                                         <Bell className="w-4 h-4" />
@@ -515,9 +509,9 @@ export default function Navigation() {
                                                 triggerRef={notifRef} 
                                                 isOpen={isNotifOpen} 
                                                 onClose={() => setIsNotifOpen(false)}
-                                                width={320}
+                                                width={384}
                                             >
-                                                <div className="w-full sm:w-96 rounded-2xl border border-border-subtle bg-bg-surface shadow-2xl overflow-hidden text-left">
+                                                <div className="w-full rounded-2xl border border-border-subtle bg-bg-surface shadow-2xl overflow-hidden text-left">
                                                     {/* Header */}
                                                     <div className="px-4 py-3 border-b border-border-subtle flex items-center justify-between bg-bg-base/50">
                                                         <div className="flex items-center gap-2">
@@ -579,13 +573,13 @@ export default function Navigation() {
                                                                     </div>
 
                                                                     <div className="flex-1 min-w-0 pr-6">
-                                                                        <div className="flex items-center justify-between mb-0.5">
-                                                                            <p className={cn("text-xs font-bold truncate", !n.read ? "text-text-primary" : "text-text-secondary")}>
+                                                                        <div className="flex items-start justify-between gap-2 mb-1">
+                                                                            <p className={cn("text-xs font-bold leading-snug break-words min-w-0", !n.read ? "text-text-primary" : "text-text-secondary")}>
                                                                                 {n.title}
                                                                             </p>
-                                                                            <span className="text-[10px] text-text-tertiary">{n.time}</span>
+                                                                            <span className="text-[10px] text-text-tertiary shrink-0 whitespace-nowrap mt-0.5">{n.time}</span>
                                                                         </div>
-                                                                        <p className="text-xs text-text-secondary line-clamp-2 leading-relaxed">
+                                                                        <p className="text-xs text-text-secondary leading-relaxed break-words whitespace-normal">
                                                                             {n.message}
                                                                         </p>
                                                                     </div>
@@ -623,11 +617,11 @@ export default function Navigation() {
                                 </div>
 
                                 {/* Device Manager Button & Dropdown */}
-                                <div className="relative shrink-0">
+                                <div className="relative shrink-0 hidden sm:block">
                                     <button
                                         type="button"
                                         onClick={() => setShowDeviceManager(!showDeviceManager)}
-                                        className="p-2 rounded-full bg-bg-surface border border-border-subtle text-text-secondary hover:text-text-primary transition-all relative flex items-center justify-center shrink-0"
+                                        className="min-w-[44px] min-h-[44px] rounded-full bg-bg-surface border border-border-subtle text-text-secondary hover:text-text-primary transition-all relative flex items-center justify-center shrink-0"
                                         title="Device Session Manager"
                                     >
                                         <Monitor className="w-4 h-4 text-brand-500" />
@@ -652,13 +646,13 @@ export default function Navigation() {
                             </div>
                         )}
 
-                        {/* Mobile Drawer Hamburger Toggle Button */}
+                        {/* Mobile Drawer Hamburger Toggle Button (Minimum 48x48px touch target) */}
                         <button
                             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                            className="w-9 h-9 rounded-xl bg-bg-surface border border-border-subtle text-text-primary hover:text-brand-500 hover:border-brand-500/40 transition-all shrink-0 flex items-center justify-center"
+                            className="min-w-[48px] min-h-[48px] rounded-2xl bg-bg-surface border border-border-subtle text-text-primary hover:text-brand-500 hover:border-brand-500/40 active:scale-95 transition-all shrink-0 flex items-center justify-center shadow-sm"
                             aria-label="Toggle navigation drawer"
                         >
-                            {isMobileMenuOpen ? <X className="w-5 h-5 text-brand-500" /> : <Menu className="w-5 h-5" />}
+                            {isMobileMenuOpen ? <X className="w-6 h-6 text-brand-500" /> : <Menu className="w-6 h-6" />}
                         </button>
                     </div>
                 </div>
@@ -676,7 +670,7 @@ export default function Navigation() {
                 >
                     <WifiOff className="w-4 h-4 shrink-0 animate-pulse" />
                     <span>
-                        <strong>OFFLINE MODE ACTIVE:</strong> Internet connectivity lost. Managing inventory, billing & Boli voice orders remain fully functional & saved on your device.
+                        <strong>OFFLINE MODE ACTIVE:</strong> Internet connectivity lost. Managing inventory & billing remain fully functional & saved on your device.
                     </span>
                 </motion.div>
             )}
@@ -702,20 +696,24 @@ export default function Navigation() {
                                 animate={{ x: 0 }}
                                 exit={{ x: '100%' }}
                                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                                className="absolute top-[5rem] right-0 bottom-0 w-[min(320px,85vw)] bg-bg-base border-l border-border-subtle flex flex-col overflow-y-auto overflow-x-hidden shadow-2xl pointer-events-auto"
+                                className="absolute top-0 right-0 bottom-0 w-[min(340px,88vw)] bg-bg-base border-l border-border-subtle flex flex-col overflow-y-auto overflow-x-hidden shadow-2xl pointer-events-auto pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]"
                             >
                         
                         {/* Drawer Header */}
                         <div className="flex items-center justify-between p-4 border-b border-border-subtle flex-shrink-0">
-                            <div className="flex items-center gap-2">
-                                <img src="/favicon.png" alt="Logo" className="w-8 h-8" />
-                                <span className="font-bold text-text-primary text-sm">Streetvend</span>
+                            <div className="flex items-center gap-2.5">
+                                <img src="/favicon.png" alt="Logo" className="w-9 h-9" />
+                                <div className="flex flex-col">
+                                    <span className="font-bold text-text-primary text-base leading-tight">Streetvend</span>
+                                    <span className="text-[10px] text-text-tertiary font-bold uppercase tracking-widest">Handheld POS</span>
+                                </div>
                             </div>
                             <button
                                 onClick={() => setIsMobileMenuOpen(false)}
-                                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-text-secondary hover:text-text-primary transition-all"
+                                className="min-w-[48px] min-h-[48px] flex items-center justify-center rounded-2xl hover:bg-white/10 text-text-secondary hover:text-text-primary active:scale-95 transition-all"
+                                aria-label="Close menu"
                             >
-                                <X className="w-4 h-4" />
+                                <X className="w-6 h-6" />
                             </button>
                         </div>
 
@@ -728,7 +726,7 @@ export default function Navigation() {
                                     window.dispatchEvent(new Event('beforeinstallprompt'));
                                     window.location.reload();
                                 }}
-                                className="w-full p-3 rounded-2xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs flex items-center justify-between shadow-lg shadow-brand-500/20 transition-all active:scale-95"
+                                className="w-full min-h-[48px] p-3 rounded-2xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs flex items-center justify-between shadow-lg shadow-brand-500/20 transition-all active:scale-95"
                             >
                                 <div className="flex items-center gap-2">
                                     <Download className="w-4 h-4 shrink-0" />
@@ -742,7 +740,7 @@ export default function Navigation() {
                         {user ? (
                             <div className="p-4 border-b border-border-subtle flex-shrink-0">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-brand-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                                    <div className="w-10 h-10 rounded-2xl bg-brand-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-md">
                                         {(user as any).storeName?.charAt(0) || 'V'}
                                     </div>
                                     <div className="min-w-0 text-left">
@@ -752,7 +750,7 @@ export default function Navigation() {
                                 </div>
                                 {/* Plan badge */}
                                 <div className="mt-2 text-left">
-                                    <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-brand-500/10 text-brand-500 border border-brand-500/20 uppercase">
+                                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-brand-500/10 text-brand-500 border border-brand-500/20 uppercase tracking-wider">
                                         {currentPlan || 'FREE'} PLAN
                                     </span>
                                 </div>
@@ -760,7 +758,7 @@ export default function Navigation() {
                         ) : isAdmin ? (
                             <div className="p-4 border-b border-border-subtle flex-shrink-0">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                                    <div className="w-10 h-10 rounded-2xl bg-red-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-md">
                                         A
                                     </div>
                                     <div className="min-w-0 text-left">
@@ -775,10 +773,13 @@ export default function Navigation() {
                         <nav className="flex-1 p-3 flex flex-col gap-1">
                             
                             <p className="text-[10px] font-bold text-text-tertiary uppercase tracking-widest px-3 pt-2 pb-1">
-                                Navigation
+                                Primary Actions
                             </p>
 
                             {[
+                                { to: '/cart', icon: ShoppingCart, label: 'New Bill & Billing Cart' },
+                                { to: '/dashboard', icon: PieChart, label: 'Dashboard' },
+                                { to: '/products', icon: Package, label: 'Products' },
                                 { to: '/ai-assistant', icon: Sparkles, label: 'AI Assistant' },
                                 { to: '/ai-insights', icon: Wand2, label: 'AI Insights' },
                                 { to: '/ai-marketing', icon: MessageSquare, label: 'AI Marketing Config' },
@@ -790,17 +791,17 @@ export default function Navigation() {
                                     to={to}
                                     onClick={() => setIsMobileMenuOpen(false)}
                                     className={cn(
-                                        "flex items-center gap-3 px-3 py-3",
-                                        "rounded-xl text-sm font-medium transition-all",
+                                        "flex items-center gap-3 px-3.5 py-3",
+                                        "rounded-2xl text-sm font-semibold transition-all min-h-[48px]",
                                         location.pathname === to
-                                            ? "bg-brand-500 text-white"
+                                            ? "bg-brand-500 text-white shadow-md shadow-brand-500/20 font-bold"
                                             : "text-text-secondary hover:bg-white/5 hover:text-text-primary"
                                     )}
                                 >
-                                    <Icon className="w-4 h-4 flex-shrink-0" />
+                                    <Icon className="w-5 h-5 flex-shrink-0" />
                                     <span>{label}</span>
                                     {location.pathname === to && (
-                                        <Check className="w-3.5 h-3.5 ml-auto" />
+                                        <Check className="w-4 h-4 ml-auto shrink-0" />
                                     )}
                                 </Link>
                             ))}
@@ -811,18 +812,35 @@ export default function Navigation() {
                                 Settings
                             </p>
 
+                            {/* Theme Selector Row */}
+                            <button
+                                onClick={() => {
+                                    toggleTheme();
+                                    setIsMobileMenuOpen(false);
+                                }}
+                                className="flex items-center justify-between px-3.5 py-3 rounded-2xl hover:bg-white/5 transition-all text-left min-h-[48px]"
+                            >
+                                <div className="flex items-center gap-3">
+                                    {theme === 'dark' ? <Moon className="w-5 h-5 text-indigo-400" /> : <Sun className="w-5 h-5 text-amber-400" />}
+                                    <span className="text-sm font-semibold text-text-secondary">Theme</span>
+                                </div>
+                                <span className="text-xs text-text-tertiary font-bold">
+                                    {theme === 'dark' ? 'Dark' : 'Light'} Mode
+                                </span>
+                            </button>
+
                             {/* Connectivity Status Row */}
                             <div 
-                                className="flex items-center justify-between px-3 py-3 rounded-xl bg-white/5 transition-all select-none"
+                                className="flex items-center justify-between px-3.5 py-3 rounded-2xl bg-white/5 transition-all select-none min-h-[48px]"
                                 title={isOnline ? "Connected to Cloud" : "Offline Mode"}
                             >
                                 <div className="flex items-center gap-3">
                                     {isOnline ? (
-                                        <Wifi className="w-4 h-4 text-emerald-400" />
+                                        <Wifi className="w-5 h-5 text-emerald-400" />
                                     ) : (
-                                        <WifiOff className="w-4 h-4 text-amber-400 animate-pulse" />
+                                        <WifiOff className="w-5 h-5 text-amber-400 animate-pulse" />
                                     )}
-                                    <span className="text-sm font-medium text-text-secondary">
+                                    <span className="text-sm font-semibold text-text-secondary">
                                         Status
                                     </span>
                                 </div>
@@ -838,7 +856,7 @@ export default function Navigation() {
 
                             {/* Language Selector Row */}
                             <div className="px-3 py-2">
-                                <p className="text-xs text-text-tertiary mb-2">
+                                <p className="text-xs font-bold text-text-tertiary mb-2 uppercase tracking-wider">
                                     Language
                                 </p>
                                 <div className="flex flex-col gap-1">
@@ -850,17 +868,17 @@ export default function Navigation() {
                                                 setIsMobileMenuOpen(false);
                                             }}
                                             className={cn(
-                                                "flex items-center gap-2 px-3 py-2.5",
-                                                "rounded-lg text-sm transition-all w-full text-left",
+                                                "flex items-center gap-3 px-3.5 py-2.5",
+                                                "rounded-xl text-sm transition-all w-full text-left min-h-[48px]",
                                                 language === lang.code
-                                                    ? "bg-brand-500/10 text-brand-500 font-medium"
+                                                    ? "bg-brand-500/10 text-brand-500 font-bold"
                                                     : "text-text-secondary hover:bg-white/5"
                                             )}
                                         >
-                                            <Globe className="w-3.5 h-3.5 flex-shrink-0" />
-                                            {lang.label}
+                                            <Globe className="w-4 h-4 flex-shrink-0" />
+                                            <span>{lang.label}</span>
                                             {language === lang.code && (
-                                                <Check className="w-3 h-3 ml-auto" />
+                                                <Check className="w-4 h-4 ml-auto" />
                                             )}
                                         </button>
                                     ))}
@@ -877,9 +895,9 @@ export default function Navigation() {
                                         setIsMobileMenuOpen(false);
                                         navigate('/login');
                                     }}
-                                    className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium w-full text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
+                                    className="flex items-center gap-3 px-3.5 py-3 rounded-2xl text-sm font-bold w-full text-red-400 hover:bg-red-500/10 transition-all cursor-pointer min-h-[48px]"
                                 >
-                                    <LogOut className="w-4 h-4 flex-shrink-0" />
+                                    <LogOut className="w-5 h-5 flex-shrink-0" />
                                     <span>{isAdmin ? 'Sign Out Admin' : 'Sign Out'}</span>
                                 </button>
                             </div>

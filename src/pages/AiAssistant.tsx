@@ -1,9 +1,15 @@
+import { apiFetch } from '../lib/apiFetch';
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+export const BUILD_HASH_TIMESTAMP = "20260809_061500_v8_ai_context";
 import { useAuth } from '../lib/auth';
 import { Bot, Send, Sparkles, User, Loader2, Mic, MicOff, Lock } from 'lucide-react';
 import { useI18n } from '../lib/I18nContext';
 import { usePlanLimits, PlanTier } from '../hooks/usePlanLimits';
 import UpgradeModal from '../components/UpgradeModal';
+import { getVendorProducts } from '../lib/dataCache';
+import { Product } from '../lib/database.types';
 
 export default function AiAssistantPage() {
     const { user } = useAuth();
@@ -19,11 +25,18 @@ export default function AiAssistantPage() {
         msg: 'Free tier allows up to 5 AI Chat queries per day. Upgrade to Starter or higher for unlimited AI Chat assistance.'
     });
 
-    const aiUsageToday = getAiUsageToday();
+    const [aiUsageCount, setAiUsageCount] = useState<number>(getAiUsageToday());
+    const [products, setProducts] = useState<Product[]>([]);
     const isFreePlan = currentPlan === 'free';
     
     const ownerName = user?.ownerName || "Raju Sharma";
     const storeName = user?.storeName || "Raju's Chaat Corner";
+
+    useEffect(() => {
+        if (user?.id) {
+            getVendorProducts(user.id).then(setProducts).catch(console.error);
+        }
+    }, [user?.id]);
 
     const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'ai'; text: string }[]>([
         { 
@@ -48,8 +61,8 @@ export default function AiAssistantPage() {
     }, [chatHistory, isLoading]);
 
     const handleSend = async (textToSend?: string) => {
-        const query = textToSend || input;
-        if (!query.trim() || isLoading) return;
+        const query = (typeof textToSend === 'string' ? textToSend : input).trim();
+        if (!query || isLoading) return;
 
         // Check query cap for Free Plan
         if (isFreePlan && !incrementAiUsage()) {
@@ -62,16 +75,29 @@ export default function AiAssistantPage() {
             return;
         }
 
+        setAiUsageCount(getAiUsageToday());
+
         const newHistory = [...chatHistory, { role: 'user' as const, text: query }];
         setChatHistory(newHistory);
         setInput('');
         setIsLoading(true);
 
         try {
-            const res = await fetch('/api/chat', {
+            const res = await apiFetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: query, language: user?.language || 'en' })
+                body: JSON.stringify({ 
+                    prompt: query, 
+                    language: user?.language || 'en',
+                    storeName,
+                    ownerName,
+                    products: products.map(p => ({
+                        name: p.name,
+                        price: p.price,
+                        category: p.category,
+                        stock: p.stock
+                    }))
+                })
             });
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
             const data = await res.json();
@@ -84,10 +110,15 @@ export default function AiAssistantPage() {
         }
     };
 
+    const handleSuggestionClick = (sug: string) => {
+        setInput(sug);
+        handleSend(sug);
+    };
+
     const toggleVoiceInput = () => {
         if (!hasFeature('ai_voice_input')) {
             setUpgradeModalConfig({
-                name: 'AI Voice Input (Boli Mode)',
+                name: 'AI Voice Input',
                 tier: 'professional',
                 msg: 'AI Voice Input is available on Professional and Enterprise plans. Upgrade to speak orders and queries naturally in your native language!'
             });
@@ -157,7 +188,7 @@ export default function AiAssistantPage() {
                             }}
                             className="px-3.5 py-1.5 bg-bg-surface-inset text-accent-pink border border-border-subtle text-xs font-bold rounded-full hover:scale-105 transition-all cursor-pointer flex items-center gap-1.5"
                         >
-                            <span>{5 - aiUsageToday} / 5 Free Queries Left</span>
+                            <span>{Math.max(0, 5 - aiUsageCount)} / 5 Free Queries Left</span>
                             <Lock className="w-3 h-3" />
                         </button>
                     ) : (
@@ -173,8 +204,10 @@ export default function AiAssistantPage() {
                 {suggestions.map((sug, i) => (
                     <button
                         key={i}
-                        onClick={() => handleSend(sug)}
-                        className="px-4 py-2 rounded-full bg-bg-surface border border-border-subtle text-xs sm:text-sm font-medium text-text-primary hover:border-brand-500/50 hover:bg-bg-surface-inset transition-all cursor-pointer whitespace-nowrap shrink-0"
+                        type="button"
+                        onClick={() => handleSuggestionClick(sug)}
+                        disabled={isLoading}
+                        className="px-4 py-2 rounded-full bg-bg-surface border border-border-subtle text-xs sm:text-sm font-medium text-text-primary hover:border-brand-500/50 hover:bg-bg-surface-inset transition-all cursor-pointer whitespace-nowrap shrink-0 disabled:opacity-50"
                     >
                         {sug}
                     </button>
@@ -204,7 +237,15 @@ export default function AiAssistantPage() {
                                         <span>STREETVEND</span>
                                     </div>
                                 )}
-                                <p className="whitespace-pre-wrap">{msg.text}</p>
+                                {msg.role === 'ai' ? (
+                                    <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-bg-surface-inset prose-pre:border prose-pre:border-border-subtle">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                            {msg.text}
+                                        </ReactMarkdown>
+                                    </div>
+                                ) : (
+                                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -221,6 +262,7 @@ export default function AiAssistantPage() {
 
                 {/* Input Bar */}
                 <div className="bg-bg-surface-inset border border-border-subtle rounded-2xl p-2.5 flex items-center gap-3">
+                    {/* Mic button removed
                     <button
                         type="button"
                         onClick={toggleVoiceInput}
@@ -229,10 +271,11 @@ export default function AiAssistantPage() {
                                 ? 'bg-red-500/20 text-red-400 animate-pulse border border-red-500/30' 
                                 : 'bg-bg-surface text-text-secondary hover:text-text-primary hover:bg-bg-surface-inset'
                         }`}
-                        title={isListening ? "Listening..." : "Voice search (Boli Mode)"}
+                        title={isListening ? "Listening..." : "Voice search"}
                     >
                         {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                     </button>
+                    */}
 
                     <input
                         type="text"

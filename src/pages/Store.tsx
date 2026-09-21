@@ -51,7 +51,7 @@ export default function StorePage() {
                 }
             }
 
-            if (!currentVendor) {
+            if (!currentVendor && import.meta.env.DEV) {
                 const found = mockDb.vendors.find(v => v.id === vendorId);
                 if (found) {
                     currentVendor = found as unknown as Vendor;
@@ -82,7 +82,7 @@ export default function StorePage() {
                 }
             }
 
-            if (storeProducts.length === 0 && !supabase) {
+            if (storeProducts.length === 0 && !supabase && import.meta.env.DEV) {
                 storeProducts = mockDb.products.filter(p => p.vendorId === vendorId) as Product[];
             }
 
@@ -219,7 +219,7 @@ export default function StorePage() {
     };
 
     return (
-        <div className="min-h-screen bg-bg-base pt-28 pb-16">
+        <div className="min-h-screen bg-bg-base pt-28" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 4rem)' }}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 
                 {orderSuccess && lastOrderDetails ? (
